@@ -13,13 +13,13 @@ export default function RootLayout({ children }) {
     <html lang="ko">
       <body>
         <div className="sidebar" style={{ backgroundColor: '#1E293B' }}>
-          {/* Logo Section (Seamless Top Header matching Topbar) */}
-          <div style={{ backgroundColor: '#ffffff', height: '70px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
-            <Link href="/" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', width: '100%', height: '100%' }}>
-               <img src="/logo.png" alt="ICTI Logo" style={{ maxWidth: '180px', maxHeight: '50px', objectFit: 'contain' }} />
+          {/* Logo Section (Naturally scaling white header to accommodate vertical logo) */}
+          <div style={{ backgroundColor: '#ffffff', padding: '24px 20px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }}>
+            <Link href="/" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', width: '100%' }}>
+               <img src="/logo.png" alt="ICTI Logo" style={{ maxWidth: '100%', maxHeight: '110px', objectFit: 'contain' }} />
             </Link>
           </div>
-          <div style={{ padding: '32px 0' }}>
+          <div style={{ padding: '32px 18px' }}>
             <SidebarNav />
           </div>
         </div>
