@@ -1,5 +1,6 @@
 import './globals.css';
 import Link from 'next/link';
+import Topbar from './components/Topbar';
 
 export const metadata = {
   title: "국제코칭훈련원 통합 관리",
@@ -20,9 +21,7 @@ export default function RootLayout({ children }) {
         </div>
         
         <div className="main-wrapper">
-          <header className="topbar">
-            현황 대시보드
-          </header>
+          <Topbar />
           <main className="content">
             {children}
           </main>
