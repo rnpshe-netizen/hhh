@@ -89,7 +89,7 @@ export default function MembersPage() {
     setSelectedMember(member);
     setIsEditing(false);
     setEditName(member.name); setEditPhone(member.phone || ''); setEditEmail(member.email || '');
-    const { data } = await supabase.from('completions').select('id, issued_date, cohort, courses(id, name)').eq('member_id', member.id).order('issued_date', { ascending: false });
+    const { data } = await supabase.from('completions').select('id, issued_date, cohort, note, courses(id, name)').eq('member_id', member.id).order('issued_date', { ascending: false });
     setMemberCompletions(data || []);
   };
 
@@ -257,6 +257,11 @@ export default function MembersPage() {
                       <div style={{ fontSize: '12px', color: 'gray', marginTop: '4px' }}>
                         발급일: {comp.issued_date || '미상'} | 기수: {comp.cohort || '-'}
                       </div>
+                      {comp.note && (
+                        <div style={{ fontSize: '12px', color: '#c2410c', marginTop: '6px', backgroundColor: '#ffedd5', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                          📌 {comp.note}
+                        </div>
+                      )}
                     </div>
                     <button onClick={() => handleDeleteCompletion(comp.id)} style={{ padding: '4px 8px', background: 'transparent', border: '1px solid red', color: 'red', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}>
                       발급 취소
