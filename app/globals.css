@@ -1,0 +1,143 @@
+:root {
+  --primary: #4A90E2;
+  --primary-hover: #357ABD;
+  --secondary: #2C3E50;
+  --surface: #FFFFFF;
+  --background: #F4F7F6;
+  --text-main: #333333;
+  --text-muted: #888888;
+  --border: #E0E4E8;
+  --success: #27AE60;
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text-main);
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar Layout */
+.sidebar {
+  width: 260px;
+  background-color: var(--secondary);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  position: fixed;
+  height: 100vh;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  z-index: 100;
+}
+
+.sidebar h2 {
+  font-size: 20px;
+  text-align: center;
+  margin-bottom: 32px;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 20px;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.sidebar nav a {
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.sidebar nav a:hover {
+  background-color: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.sidebar nav a[data-active="true"] {
+  background-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 6px rgba(74, 144, 226, 0.3);
+}
+
+/* Main Content Area */
+.main-wrapper {
+  margin-left: 260px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: 70px;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.content {
+  padding: 32px;
+  flex: 1;
+}
+
+/* Card & Utilities */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  padding: 24px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #E3F2FD;
+  color: #1976D2;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge.success {
+  background-color: #E8F5E9;
+  color: #2E7D32;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+th {
+  background-color: #FAFAFA;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 14px;
+}
+td {
+  font-size: 15px;
+}

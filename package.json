@@ -15,7 +15,9 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "dotenv": "^17.3.1",
     "eslint": "^9",
-    "eslint-config-next": "16.2.1"
+    "eslint-config-next": "16.2.1",
+    "xlsx": "^0.18.5"
   }
 }
