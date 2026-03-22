@@ -28,14 +28,15 @@ body {
 /* Sidebar Layout */
 .sidebar {
   width: 260px;
-  background-color: var(--secondary);
-  color: #fff;
+  background-color: #F8FAFC !important;
+  color: #1E293B !important;
   display: flex;
   flex-direction: column;
   padding: 0;
   position: fixed;
   height: 100vh;
-  box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+  border-right: 1px solid #E2E8F0;
   z-index: 100;
 }
 
@@ -44,7 +45,7 @@ body {
   text-align: center;
   margin-bottom: 32px;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid #E2E8F0;
   padding-bottom: 20px;
 }
 
@@ -56,22 +57,22 @@ body {
 }
 
 .sidebar nav a {
-  color: rgba(255,255,255,0.7);
+  color: #475569 !important;
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
   padding: 12px 16px;
   border-radius: var(--radius);
   transition: all 0.2s ease;
 }
 
 .sidebar nav a:hover {
-  background-color: rgba(255,255,255,0.1);
-  color: #fff;
+  background-color: rgba(0,0,0,0.04) !important;
+  color: #1E293B !important;
 }
 
 .sidebar nav a[data-active="true"] {
-  background-color: var(--primary);
-  color: #fff;
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 4px 6px rgba(74, 144, 226, 0.3);
 }
 
