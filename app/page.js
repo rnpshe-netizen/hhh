@@ -8,14 +8,20 @@ export default async function Dashboard() {
   const { count: courseCount } = await supabase.from('courses').select('*', { count: 'exact', head: true });
   const { count: compCount } = await supabase.from('completions').select('*', { count: 'exact', head: true });
   
-  // Get all completions to compute statistics
-  const { data: allCompletions } = await supabase.from('completions').select('issued_date, courses(name)');
+  // Get all completions to compute statistics (Supabase 1000건 제한 회피 릴레이 패치)
+  const allCompletions = [];
+  for (let i = 0;; i += 1000) {
+    const { data } = await supabase.from('completions').select('issued_date, courses(name)').range(i, i + 999);
+    if (!data || data.length === 0) break;
+    allCompletions.push(...data);
+  }
   
-  // Quick recent 6
+  // Quick recent 10 (발급일 최신순 정렬 버그 수정 반영)
   const { data: recent } = await supabase.from('completions')
     .select('id, issued_date, cohort, note, members(name), courses(name)')
-    .order('id', { ascending: false })
-    .limit(6);
+    .order('issued_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(10);
 
   // Statistic Processors
   const courseDist = {};
