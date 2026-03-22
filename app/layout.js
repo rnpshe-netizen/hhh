@@ -14,9 +14,9 @@ export default function RootLayout({ children }) {
         <div className="sidebar" style={{ backgroundColor: '#1E293B' }}>
           {/* Logo Section */}
           <div style={{ padding: '24px 20px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }}>
-            <Link href="/" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50px' }}>
-               <img src="/logo.png" alt="ICTI Logo" style={{ maxWidth: '100%', maxHeight: '50px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-               <div style={{ display: 'none', color: '#fff', fontSize: '22px', fontWeight: 'bold', letterSpacing: '1px' }}>ICTI-MIS</div>
+            <Link href="/" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50px', gap: '10px', textDecoration: 'none' }}>
+               <img src="/logo.png" alt="" style={{ maxWidth: '40px', maxHeight: '40px', objectFit: 'contain' }} />
+               <span style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold', letterSpacing: '1px' }}>ICTI-MIS</span>
             </Link>
           </div>
           <nav>
