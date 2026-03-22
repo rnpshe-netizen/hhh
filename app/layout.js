@@ -13,23 +13,15 @@ export default function RootLayout({ children }) {
     <html lang="ko">
       <body>
         <div className="sidebar" style={{ backgroundColor: '#1E293B' }}>
-          {/* Logo Section (Phase 1.8.1 Fix: White Contrast Backdrop) */}
-          <div style={{ padding: '32px 20px 24px 20px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '24px' }}>
-            <Link href="/" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none' }}>
-               <div style={{ 
-                 backgroundColor: '#ffffff', 
-                 padding: '12px 24px', 
-                 borderRadius: '16px', 
-                 display: 'flex', 
-                 justifyContent: 'center', 
-                 alignItems: 'center',
-                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-               }}>
-                 <img src="/logo.png" alt="ICTI Logo" style={{ maxWidth: '150px', maxHeight: '60px', objectFit: 'contain' }} />
-               </div>
+          {/* Logo Section (Seamless Top Header matching Topbar) */}
+          <div style={{ backgroundColor: '#ffffff', height: '70px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
+            <Link href="/" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', width: '100%', height: '100%' }}>
+               <img src="/logo.png" alt="ICTI Logo" style={{ maxWidth: '180px', maxHeight: '50px', objectFit: 'contain' }} />
             </Link>
           </div>
-          <SidebarNav />
+          <div style={{ padding: '32px 0' }}>
+            <SidebarNav />
+          </div>
         </div>
         
         <div className="main-wrapper">
