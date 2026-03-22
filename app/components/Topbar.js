@@ -16,7 +16,7 @@ export default function Topbar() {
 
   return (
     <header className="topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-      <span>코칭 대시보드 관리자 화면</span>
+      <span style={{ fontWeight: 'bold', fontSize: '18px', color: 'var(--secondary)' }}>ICTI-MIS Dashboard</span>
       <button 
         onClick={handleLogout}
         style={{ 
