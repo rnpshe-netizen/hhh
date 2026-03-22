@@ -30,16 +30,16 @@ export default function SidebarNav() {
         return (
           <Link key={item.href} href={item.href} style={{
             display: 'flex', alignItems: 'center', gap: '18px', padding: '16px 24px',
-            color: isActive ? '#ffffff' : '#94A3B8',
+            color: isActive ? '#ffffff' : '#475569',
             backgroundColor: isActive ? '#4A90E2' : 'transparent',
             borderRadius: '16px', textDecoration: 'none', 
             fontWeight: isActive ? 700 : 600,
             fontSize: '18px',
             transition: 'all 0.2s ease',
-            boxShadow: isActive ? '0 6px 16px rgba(74, 144, 226, 0.4)' : 'none'
+            boxShadow: isActive ? '0 6px 16px rgba(74, 144, 226, 0.35)' : 'none'
           }}
-          onMouseEnter={(e) => { if(!isActive) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#e2e8f0'; } }}
-          onMouseLeave={(e) => { if(!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#94A3B8'; } }}
+          onMouseEnter={(e) => { if(!isActive) { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)'; e.currentTarget.style.color = '#1E293B'; } }}
+          onMouseLeave={(e) => { if(!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; } }}
           >
             {item.icon}
             <span style={{ letterSpacing: '0.5px' }}>{item.name}</span>

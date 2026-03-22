@@ -12,14 +12,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ko">
       <body>
-        <div className="sidebar" style={{ backgroundColor: '#1E293B' }}>
-          {/* Logo Section (Naturally scaling white header to accommodate vertical logo) */}
-          <div style={{ backgroundColor: '#ffffff', padding: '24px 20px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }}>
+        <div className="sidebar" style={{ backgroundColor: '#F8FAFC', borderRight: '1px solid #E2E8F0' }}>
+          {/* Logo Section - Light Theme (No bounding boxes needed) */}
+          <div style={{ padding: '36px 20px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Link href="/" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', width: '100%' }}>
                <img src="/logo.png" alt="ICTI Logo" style={{ maxWidth: '100%', maxHeight: '110px', objectFit: 'contain' }} />
             </Link>
           </div>
-          <div style={{ padding: '32px 18px' }}>
+          <div style={{ padding: '16px 18px' }}>
             <SidebarNav />
           </div>
         </div>
