@@ -13,11 +13,20 @@ export default function RootLayout({ children }) {
     <html lang="ko">
       <body>
         <div className="sidebar" style={{ backgroundColor: '#1E293B' }}>
-          {/* Logo Section */}
-          <div style={{ padding: '36px 20px 28px 20px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '24px' }}>
-            <Link href="/" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '16px', textDecoration: 'none' }}>
-               <img src="/logo.png" alt="Logo" style={{ maxWidth: '140px', maxHeight: '75px', objectFit: 'contain', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))' }} />
-               <span style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold', letterSpacing: '1px' }}>ICTI-MIS</span>
+          {/* Logo Section (Phase 1.8.1 Fix: White Contrast Backdrop) */}
+          <div style={{ padding: '32px 20px 24px 20px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '24px' }}>
+            <Link href="/" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none' }}>
+               <div style={{ 
+                 backgroundColor: '#ffffff', 
+                 padding: '12px 24px', 
+                 borderRadius: '16px', 
+                 display: 'flex', 
+                 justifyContent: 'center', 
+                 alignItems: 'center',
+                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+               }}>
+                 <img src="/logo.png" alt="ICTI Logo" style={{ maxWidth: '150px', maxHeight: '60px', objectFit: 'contain' }} />
+               </div>
             </Link>
           </div>
           <SidebarNav />
