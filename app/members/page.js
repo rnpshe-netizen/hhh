@@ -357,8 +357,34 @@ export default function MembersPage() {
     setIssueCourseId(''); setIssueDate(''); setIssueCohort('');
   };
 
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && selectedMember) closeMemberDetail();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedMember]);
+
+  // 전화번호 자동 포맷팅 (숫자만 입력해도 010-XXXX-XXXX 형태로)
+  const formatPhone = (value) => {
+    const digits = value.replace(/[^0-9]/g, '');
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return digits.slice(0, 3) + '-' + digits.slice(3);
+    return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+  };
+
+  // 이메일 형식 검증
+  const isValidEmail = (email) => !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
   const handleUpdateMember = async () => {
     if (!editName.trim()) return alert("이름을 입력해주세요.");
+    if (editPhone.trim() && !/^01[016789]-?\d{3,4}-?\d{4}$/.test(editPhone.replace(/-/g, ''))) {
+      return alert("전화번호 형식이 올바르지 않습니다.\n예: 010-1234-5678");
+    }
+    if (editEmail.trim() && !isValidEmail(editEmail)) {
+      return alert("이메일 형식이 올바르지 않습니다.\n예: example@email.com");
+    }
     if (editPhone.trim() && editPhone !== selectedMember.phone) {
       const { data: dup } = await supabase.from('members').select('id').eq('phone', editPhone.trim()).neq('id', selectedMember.id).limit(1);
       if (dup && dup.length > 0) return alert("이미 동일한 연락처를 사용하는 다른 회원이 있습니다.");
@@ -504,7 +530,7 @@ export default function MembersPage() {
           <h3 style={{ marginBottom: '16px' }}>신규 회원 등록</h3>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <input type="text" placeholder="이름 (필수)" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '8px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} />
-            <input type="text" placeholder="연락처 (중복검사)" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ padding: '8px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} />
+            <input type="text" placeholder="연락처 (예: 01012345678)" value={newPhone} onChange={e => setNewPhone(formatPhone(e.target.value))} style={{ padding: '8px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} />
             <input type="email" placeholder="이메일" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ padding: '8px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} />
             <button onClick={handleAddMember} style={{ padding: '8px 24px', backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>명단에 추가</button>
           </div>
@@ -606,8 +632,10 @@ export default function MembersPage() {
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <input type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="이름" style={{ padding: '8px' }} />
-                  <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="연락처" style={{ padding: '8px' }} />
-                  <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="이메일" style={{ padding: '8px' }} />
+                  <input type="text" value={editPhone} onChange={e => setEditPhone(formatPhone(e.target.value))} placeholder="연락처 (예: 010-1234-5678)" style={{ padding: '8px' }}
+                    onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
+                  <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="이메일 (예: abc@email.com)" style={{ padding: '8px' }}
+                    onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
                   <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                     <button onClick={handleUpdateMember} style={{ flex: 1, padding: '10px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>저장하기</button>
                     <button onClick={handleDeleteMember} style={{ padding: '10px 20px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer' }}>영구 삭제</button>
