@@ -72,9 +72,21 @@ export default function MembersPage() {
 
     let query = supabase.from('members').select('*', { count: 'exact' });
 
-    // 검색 (이름 + 연락처 + 이메일)
+    // 검색 (이름 + 연락처 + 이메일) — 하이픈 없이 번호 입력해도 검색 가능
     if (search.trim()) {
-      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
+      const s = search.trim();
+      const digitsOnly = s.replace(/[^0-9]/g, '');
+      // 숫자만 포함된 검색어(전화번호)인 경우, 하이픈 포함/미포함 모두 검색
+      if (digitsOnly.length >= 3 && digitsOnly === s.replace(/[-\s]/g, '')) {
+        const formatted = digitsOnly.replace(/^(01[016789])(\d{3,4})(\d{4})$/, '$1-$2-$3');
+        if (formatted !== digitsOnly) {
+          query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,phone.ilike.%${formatted}%,email.ilike.%${s}%`);
+        } else {
+          query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,phone.ilike.%${digitsOnly}%,email.ilike.%${s}%`);
+        }
+      } else {
+        query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
+      }
     }
 
     // 연락처 유무 필터
@@ -85,12 +97,35 @@ export default function MembersPage() {
     }
 
     // 매칭 순위 필터 (해당 순위 이름 목록으로 in 쿼리)
-    if (rankFilter !== 'all') {
+    if (rankFilter === 'none') {
+      // 순위 없음: 전체 가져와서 클라이언트 필터 (페이지네이션 직접 처리)
+      const allRankedSet = new Set([...(rankNames[1] || []), ...(rankNames[2] || []), ...(rankNames[3] || [])]);
+      query = query.order(sortField, { ascending: sortAsc });
+      // 충분히 큰 범위를 가져와서 필터링 후 페이징
+      const batchSize = 500;
+      let allFiltered = [];
+      let offset = 0;
+      let totalFiltered = 0;
+      while (true) {
+        const { data: batch } = await query.range(offset, offset + batchSize - 1);
+        if (!batch || batch.length === 0) break;
+        const filtered = batch.filter(m => !allRankedSet.has(m.name));
+        allFiltered = allFiltered.concat(filtered);
+        offset += batchSize;
+        if (batch.length < batchSize) break;
+      }
+      totalFiltered = allFiltered.length;
+      const sliced = allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+      setMembers(sliced);
+      setTotalCount(totalFiltered);
+      setSelectedIds(new Set());
+      setLoading(false);
+      return;
+    } else if (rankFilter !== 'all') {
       const names = rankNames[Number(rankFilter)] || [];
       if (names.length > 0) {
         query = query.in('name', names);
       } else {
-        // 해당 순위에 이름이 없으면 빈 결과
         setMembers([]);
         setTotalCount(0);
         setLoading(false);
@@ -184,7 +219,9 @@ export default function MembersPage() {
       } else if (contactFilter === 'none') {
         query = query.or('phone.is.null,phone.eq.');
       }
-      if (rankFilter !== 'all') {
+      if (rankFilter === 'none') {
+        // 순위 없음: 가져온 후 클라이언트 필터링
+      } else if (rankFilter !== 'all') {
         const names = rankNames[Number(rankFilter)] || [];
         if (names.length > 0) query = query.in('name', names);
         else break;
@@ -192,7 +229,12 @@ export default function MembersPage() {
       query = query.order(sortField, { ascending: sortAsc }).range(from, from + batchSize - 1);
       const { data } = await query;
       if (!data || data.length === 0) break;
-      allMembers = allMembers.concat(data);
+      if (rankFilter === 'none') {
+        const allRankedSet = new Set([...(rankNames[1] || []), ...(rankNames[2] || []), ...(rankNames[3] || [])]);
+        allMembers = allMembers.concat(data.filter(m => !allRankedSet.has(m.name)));
+      } else {
+        allMembers = allMembers.concat(data);
+      }
       if (data.length < batchSize) break;
       from += batchSize;
     }
@@ -348,6 +390,7 @@ export default function MembersPage() {
           <option value="1">🟢 1순위 (완벽일치)</option>
           <option value="2">🟡 2순위 (과정일치)</option>
           <option value="3">🔴 3순위 (이름만일치)</option>
+          <option value="none">⚪ 순위 없음</option>
         </select>
         {(contactFilter !== 'all' || rankFilter !== 'all') && (
           <button onClick={() => { setContactFilter('all'); setRankFilter('all'); }} style={{ padding: '4px 10px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
