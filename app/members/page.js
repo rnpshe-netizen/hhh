@@ -28,8 +28,22 @@ export default function MembersPage() {
   const [issueDate, setIssueDate] = useState('');
   const [issueCohort, setIssueCohort] = useState('');
 
+  // Phase 2A: 매칭 순위 조회용 맵 (이름 → 순위 정보)
+  const [matchRankMap, setMatchRankMap] = useState({});
+
   useEffect(() => {
     supabase.from('courses').select('*').order('created_at').then(({ data }) => setCourses(data || []));
+    // matching_report.json에서 순위 맵 구성
+    fetch('/matching_report.json')
+      .then(r => r.json())
+      .then(report => {
+        const map = {};
+        (report.exactMatch || []).forEach(name => { map[name] = { rank: 1, label: '1순위 완벽일치', color: '#16a34a', bg: '#dcfce7' }; });
+        (report.courseMatch || []).forEach(name => { if (!map[name]) map[name] = { rank: 2, label: '2순위 과정일치', color: '#ca8a04', bg: '#fef9c3' }; });
+        (report.nameOnlyMatch || []).forEach(name => { if (!map[name]) map[name] = { rank: 3, label: '3순위 이름만일치', color: '#dc2626', bg: '#fee2e2' }; });
+        setMatchRankMap(map);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -226,6 +240,24 @@ export default function MembersPage() {
                 </button>
               </div>
               
+              {/* Phase 2A 매칭 순위 뱃지 */}
+              {matchRankMap[selectedMember.name] && (
+                <div style={{ marginBottom: '12px' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    color: matchRankMap[selectedMember.name].color,
+                    backgroundColor: matchRankMap[selectedMember.name].bg,
+                    border: `1px solid ${matchRankMap[selectedMember.name].color}`,
+                  }}>
+                    📋 연락처 매칭 {matchRankMap[selectedMember.name].label}
+                  </span>
+                </div>
+              )}
+
               {isEditing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <input type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="이름" style={{ padding: '8px' }} />
