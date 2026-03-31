@@ -2,6 +2,7 @@ export const revalidate = 0;
 
 import { supabase } from '../lib/supabaseClient';
 import DashboardClient from './DashboardClient';
+import RecentCompletions from './RecentCompletions';
 
 export default async function Dashboard() {
   // 모든 쿼리를 병렬 실행하여 로딩 속도 대폭 개선
@@ -17,6 +18,7 @@ export default async function Dashboard() {
     { count: hasPhoneCount },
     { count: thisMonthCount },
     { data: recent },
+    { data: coursesList },
     // completions 릴레이 패치도 병렬 (1000건씩 7개 동시 요청)
     ...completionBatches
   ] = await Promise.all([
@@ -27,6 +29,8 @@ export default async function Dashboard() {
     supabase.from('members').select('*', { count: 'exact', head: true }).not('phone', 'is', null).neq('phone', ''),
     // 이번 달 신규 수료자 수
     supabase.from('completions').select('*', { count: 'exact', head: true }).gte('issued_date', thisMonthStart),
+    // 과정 목록 (차트 클릭 시 이동용)
+    supabase.from('courses').select('id, name'),
     supabase.from('completions')
       .select('id, issued_date, cohort, note, members(name), courses(name)')
       .order('issued_date', { ascending: false, nullsFirst: false })
@@ -57,6 +61,10 @@ export default async function Dashboard() {
   const pieData = Object.entries(courseDist).map(([name, value]) => ({ name, value }));
   const trendData = Object.entries(yearDist).sort((a,b) => a[0].localeCompare(b[0])).map(([year, count]) => ({ year, count }));
   const barData = [...pieData].sort((a,b) => b.value - a.value);
+
+  // 과정명 → ID 맵 (차트 클릭 시 수료 현황 페이지 이동용)
+  const courseIdMap = {};
+  (coursesList || []).forEach(c => { courseIdMap[c.name] = c.id; });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -94,35 +102,10 @@ export default async function Dashboard() {
       </div>
 
       {/* Grid for Charts handled by Client Component */}
-      <DashboardClient pieData={pieData} trendData={trendData} barData={barData} />
+      <DashboardClient pieData={pieData} trendData={trendData} barData={barData} courseIdMap={courseIdMap} />
 
-      {/* Recent History Table */}
-      <div className="card">
-        <h2 style={{ marginBottom: '16px', fontSize:'18px', color: 'var(--secondary)' }}>최근 발급 현황 보드</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>회원명</th>
-              <th>과정명</th>
-              <th>기수</th>
-              <th>발급일</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(recent || []).map((r) => (
-              <tr key={r.id}>
-                <td style={{ fontWeight: 500 }}>{r.members?.name}</td>
-                <td>
-                  <span className="badge">{r.courses?.name}</span>
-                  {r.note && <span className="badge" style={{marginLeft: '8px', backgroundColor: '#ffedd5', color: '#c2410c'}}>📌 {r.note}</span>}
-                </td>
-                <td>{r.cohort || '-'}</td>
-                <td>{r.issued_date || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* 최근 발급 현황 — 클라이언트 컴포넌트에서 '더보기' 처리 */}
+      <RecentCompletions initial={recent || []} />
 
     </div>
   );

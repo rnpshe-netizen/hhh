@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { logActivity } from '../../lib/activityLog';
 
 const PAGE_SIZE = 50;
 
@@ -391,6 +392,7 @@ export default function MembersPage() {
     }
     const { error } = await supabase.from('members').update({ name: editName, phone: editPhone, email: editEmail }).eq('id', selectedMember.id);
     if (!error) {
+      logActivity({ action: 'update', targetType: 'member', targetId: selectedMember.id, targetName: editName, details: `이름: ${selectedMember.name}→${editName}, 연락처: ${selectedMember.phone||'없음'}→${editPhone||'없음'}` });
       setMembers(members.map(m => m.id === selectedMember.id ? { ...m, name: editName, phone: editPhone, email: editEmail } : m));
       setSelectedMember({ ...selectedMember, name: editName, phone: editPhone, email: editEmail });
       setIsEditing(false);
@@ -400,10 +402,31 @@ export default function MembersPage() {
     }
   };
 
-  const handleDeleteMember = async () => {
-    if (window.confirm("🚨 [연쇄 삭제 경고]\n이 회원을 정말 영구 삭제하시겠습니까?\n이 회원이 이수한 모든 수료 및 자격증 기록도 함께 우주 끝으로 날아갑니다!!")) {
-      const { error } = await supabase.from('members').delete().eq('id', selectedMember.id);
+  // 회원 비활성화(숨김) — 삭제하지 않고 숨기기
+  const handleHideMember = async () => {
+    if (window.confirm("이 회원을 숨김 처리하시겠습니까?\n수료 기록은 보존되며, 목록에서만 숨겨집니다.")) {
+      const { error } = await supabase.from('members').update({ is_active: false }).eq('id', selectedMember.id);
       if (!error) {
+        logActivity({ action: 'hide', targetType: 'member', targetId: selectedMember.id, targetName: selectedMember.name, details: '회원 숨김 처리' });
+        closeMemberDetail();
+        fetchMembers();
+      } else {
+        if (error.message.includes('is_active')) {
+          alert("⚠️ 아직 데이터베이스에 숨김 기능(is_active 컬럼)이 세팅되지 않았습니다.\n\nSupabase SQL Editor에서 scripts/alter-members.sql을 실행해주세요.");
+        } else {
+          alert("숨김 처리 실패: " + error.message);
+        }
+      }
+    }
+  };
+
+  const handleDeleteMember = async () => {
+    if (window.confirm("🚨 [연쇄 삭제 경고]\n이 회원을 정말 영구 삭제하시겠습니까?\n이 회원이 이수한 모든 수료 및 자격증 기록도 함께 우주 끝으로 날아갑니다!!\n\n💡 영구 삭제 대신 [숨기기]를 사용하면 기록을 보존할 수 있습니다.")) {
+      const memberName = selectedMember.name;
+      const memberId = selectedMember.id;
+      const { error } = await supabase.from('members').delete().eq('id', memberId);
+      if (!error) {
+        logActivity({ action: 'delete', targetType: 'member', targetId: memberId, targetName: memberName, details: '회원 영구 삭제 (수료 기록 포함)' });
         closeMemberDetail();
         fetchMembers();
       } else {
@@ -638,6 +661,7 @@ export default function MembersPage() {
                     onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
                   <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                     <button onClick={handleUpdateMember} style={{ flex: 1, padding: '10px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>저장하기</button>
+                    <button onClick={handleHideMember} style={{ padding: '10px 20px', background: '#fef3c7', color: '#92400e', border: '1px solid #fbbf24', borderRadius: '4px', cursor: 'pointer' }}>숨기기</button>
                     <button onClick={handleDeleteMember} style={{ padding: '10px 20px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer' }}>영구 삭제</button>
                   </div>
                 </div>

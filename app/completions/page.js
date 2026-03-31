@@ -1,18 +1,20 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 
 const PAGE_SIZE = 50;
 
 export default function CompletionsPage() {
+  const searchParams = useSearchParams();
   const [completions, setCompletions] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  // 필터
-  const [courseFilter, setCourseFilter] = useState('all');
+  // 필터 — URL 파라미터에서 초기값 읽기 (대시보드 차트 클릭 시)
+  const [courseFilter, setCourseFilter] = useState(searchParams?.get('course') || 'all');
   const [search, setSearch] = useState('');
   const [cohortFilter, setCohortFilter] = useState('');
 
