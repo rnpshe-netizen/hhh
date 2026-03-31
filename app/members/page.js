@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
 const PAGE_SIZE = 50;
@@ -17,7 +17,10 @@ export default function MembersPage() {
 
   // 필터 상태
   const [contactFilter, setContactFilter] = useState('all'); // all | has | none
-  const [rankFilter, setRankFilter] = useState('all'); // all | 1 | 2 | 3
+  const [rankFilter, setRankFilter] = useState('all'); // all | 1 | 2 | 3 | none
+  const [courseFilter, setCourseFilter] = useState(new Set()); // 빈 Set = 전체, Set에 course_id가 있으면 해당 과정만
+  const [courseDropOpen, setCourseDropOpen] = useState(false);
+  const courseDropRef = useRef(null);
 
   // 체크박스 선택 상태
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -46,6 +49,15 @@ export default function MembersPage() {
   // Phase 2A: 매칭 순위 조회용 맵 (이름 → 순위 정보)
   const [matchRankMap, setMatchRankMap] = useState({});
   const [rankNames, setRankNames] = useState({ 1: [], 2: [], 3: [] });
+
+  // 과정 체크박스 드롭다운 바깥 클릭 시 닫기
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (courseDropRef.current && !courseDropRef.current.contains(e.target)) setCourseDropOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   useEffect(() => {
     supabase.from('courses').select('*').order('created_at').then(({ data }) => setCourses(data || []));
@@ -100,6 +112,22 @@ export default function MembersPage() {
       query = query.or('phone.is.null,phone.eq.');
     }
 
+    // 수료 과정 필터 — 체크된 과정을 수료한 회원의 ID 목록으로 필터링
+    if (courseFilter.size > 0) {
+      const courseIds = [...courseFilter];
+      const { data: compRows } = await supabase.from('completions').select('member_id').in('course_id', courseIds);
+      const memberIds = [...new Set((compRows || []).map(r => r.member_id))];
+      if (memberIds.length > 0) {
+        query = query.in('id', memberIds);
+      } else {
+        setMembers([]);
+        setTotalCount(0);
+        setSelectedIds(new Set());
+        setLoading(false);
+        return;
+      }
+    }
+
     // 매칭 순위 필터 (해당 순위 이름 목록으로 in 쿼리)
     if (rankFilter === 'none') {
       // 순위 없음: 전체 가져와서 클라이언트 필터 (페이지네이션 직접 처리)
@@ -148,7 +176,7 @@ export default function MembersPage() {
     setTotalCount(count || 0);
     setSelectedIds(new Set());
     setLoading(false);
-  }, [page, search, sortField, sortAsc, contactFilter, rankFilter, rankNames]);
+  }, [page, search, sortField, sortAsc, contactFilter, rankFilter, rankNames, courseFilter]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => { fetchMembers(); }, 300);
@@ -156,7 +184,7 @@ export default function MembersPage() {
   }, [fetchMembers]);
 
   // 페이지 또는 필터 변경 시 페이지 초기화
-  useEffect(() => { setPage(1); }, [search, contactFilter, rankFilter]);
+  useEffect(() => { setPage(1); }, [search, contactFilter, rankFilter, courseFilter]);
 
   // 정렬 토글
   const handleSort = (field) => {
@@ -222,6 +250,13 @@ export default function MembersPage() {
         query = query.not('phone', 'is', null).neq('phone', '');
       } else if (contactFilter === 'none') {
         query = query.or('phone.is.null,phone.eq.');
+      }
+      if (courseFilter.size > 0) {
+        const courseIds = [...courseFilter];
+        const { data: compRows } = await supabase.from('completions').select('member_id').in('course_id', courseIds);
+        const memberIds = [...new Set((compRows || []).map(r => r.member_id))];
+        if (memberIds.length > 0) query = query.in('id', memberIds);
+        else break;
       }
       if (rankFilter === 'none') {
         // 순위 없음: 가져온 후 클라이언트 필터링
@@ -382,7 +417,7 @@ export default function MembersPage() {
       </div>
 
       {/* 필터 바 */}
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', fontSize: '14px' }}>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', fontSize: '14px', flexWrap: 'wrap' }}>
         <span style={{ color: '#6b7280', fontWeight: 'bold' }}>필터:</span>
         <select value={contactFilter} onChange={e => setContactFilter(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px' }}>
           <option value="all">연락처: 전체</option>
@@ -396,8 +431,33 @@ export default function MembersPage() {
           <option value="3">🔴 3순위 (이름만일치)</option>
           <option value="none">⚪ 순위 없음</option>
         </select>
-        {(contactFilter !== 'all' || rankFilter !== 'all') && (
-          <button onClick={() => { setContactFilter('all'); setRankFilter('all'); }} style={{ padding: '4px 10px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
+        <div ref={courseDropRef} style={{ position: 'relative' }}>
+          <button onClick={() => setCourseDropOpen(!courseDropOpen)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', background: '#fff', cursor: 'pointer', minWidth: '160px', textAlign: 'left' }}>
+            {courseFilter.size === 0 ? '수료 과정: 전체' : `수료 과정: ${courseFilter.size}개 선택`} ▾
+          </button>
+          {courseDropOpen && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', marginTop: '4px', padding: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', minWidth: '220px' }}>
+              {courses.map(c => (
+                <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', cursor: 'pointer', fontSize: '13px' }}>
+                  <input type="checkbox" checked={courseFilter.has(c.id)} onChange={() => {
+                    setCourseFilter(prev => {
+                      const next = new Set(prev);
+                      if (next.has(c.id)) next.delete(c.id); else next.add(c.id);
+                      return next;
+                    });
+                  }} />
+                  📜 {c.name}
+                </label>
+              ))}
+              <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '6px', paddingTop: '6px', display: 'flex', gap: '8px' }}>
+                <button onClick={() => setCourseFilter(new Set(courses.map(c => c.id)))} style={{ fontSize: '12px', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}>전체 선택</button>
+                <button onClick={() => setCourseFilter(new Set())} style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}>초기화</button>
+              </div>
+            </div>
+          )}
+        </div>
+        {(contactFilter !== 'all' || rankFilter !== 'all' || courseFilter.size > 0) && (
+          <button onClick={() => { setContactFilter('all'); setRankFilter('all'); setCourseFilter(new Set()); setCourseDropOpen(false); }} style={{ padding: '4px 10px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
             필터 초기화
           </button>
         )}
