@@ -112,20 +112,49 @@ export default function MembersPage() {
       query = query.or('phone.is.null,phone.eq.');
     }
 
-    // 수료 과정 필터 — 체크된 과정을 수료한 회원의 ID 목록으로 필터링
+    // 수료 과정 필터 — completions 관계를 inner join하여 해당 과정 수료자만 조회
     if (courseFilter.size > 0) {
       const courseIds = [...courseFilter];
-      const { data: compRows } = await supabase.from('completions').select('member_id').in('course_id', courseIds);
-      const memberIds = [...new Set((compRows || []).map(r => r.member_id))];
-      if (memberIds.length > 0) {
-        query = query.in('id', memberIds);
-      } else {
-        setMembers([]);
-        setTotalCount(0);
-        setSelectedIds(new Set());
-        setLoading(false);
-        return;
+      // completions 테이블과 inner join (completions!inner)
+      // 해당 course_id에 해당하는 수료 기록이 있는 회원만 반환
+      query = supabase.from('members')
+        .select('*, completions!inner(course_id)', { count: 'exact' })
+        .in('completions.course_id', courseIds);
+
+      // 기존 필터 재적용 (검색, 연락처)
+      if (search.trim()) {
+        const s = search.trim();
+        const digitsOnly = s.replace(/[^0-9]/g, '');
+        if (digitsOnly.length >= 3 && digitsOnly === s.replace(/[-\s]/g, '')) {
+          let withHyphen = digitsOnly;
+          if (digitsOnly.length <= 3) withHyphen = digitsOnly;
+          else if (digitsOnly.length <= 7) withHyphen = digitsOnly.slice(0, 3) + '-' + digitsOnly.slice(3);
+          else withHyphen = digitsOnly.slice(0, 3) + '-' + digitsOnly.slice(3, 7) + '-' + digitsOnly.slice(7);
+          query = query.or(`name.ilike.%${s}%,phone.ilike.%${withHyphen}%,phone.ilike.%${digitsOnly}%,email.ilike.%${s}%`);
+        } else {
+          query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
+        }
       }
+      if (contactFilter === 'has') {
+        query = query.not('phone', 'is', null).neq('phone', '');
+      } else if (contactFilter === 'none') {
+        query = query.or('phone.is.null,phone.eq.');
+      }
+
+      query = query.order(sortField, { ascending: sortAsc }).range(from, to);
+      const { data, count } = await query;
+      // completions 필드 제거 후 반환 (중복 회원 제거)
+      const seen = new Set();
+      const uniqueMembers = (data || []).filter(m => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      }).map(({ completions, ...rest }) => rest);
+      setMembers(uniqueMembers);
+      setTotalCount(count || 0);
+      setSelectedIds(new Set());
+      setLoading(false);
+      return;
     }
 
     // 매칭 순위 필터 (해당 순위 이름 목록으로 in 쿼리)
@@ -253,10 +282,13 @@ export default function MembersPage() {
       }
       if (courseFilter.size > 0) {
         const courseIds = [...courseFilter];
-        const { data: compRows } = await supabase.from('completions').select('member_id').in('course_id', courseIds);
-        const memberIds = [...new Set((compRows || []).map(r => r.member_id))];
-        if (memberIds.length > 0) query = query.in('id', memberIds);
-        else break;
+        query = supabase.from('members')
+          .select('*, completions!inner(course_id)')
+          .in('completions.course_id', courseIds);
+        // 기존 필터 재적용
+        if (search.trim()) query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
+        if (contactFilter === 'has') { query = query.not('phone', 'is', null).neq('phone', ''); }
+        else if (contactFilter === 'none') { query = query.or('phone.is.null,phone.eq.'); }
       }
       if (rankFilter === 'none') {
         // 순위 없음: 가져온 후 클라이언트 필터링
