@@ -1,11 +1,20 @@
 "use client";
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 
 const PAGE_SIZE = 50;
 
+// Next.js에서 useSearchParams는 Suspense 경계 안에서 사용해야 함
 export default function CompletionsPage() {
+  return (
+    <Suspense fallback={<p>수료 현황을 불러오는 중입니다...</p>}>
+      <CompletionsContent />
+    </Suspense>
+  );
+}
+
+function CompletionsContent() {
   const searchParams = useSearchParams();
   const [completions, setCompletions] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
