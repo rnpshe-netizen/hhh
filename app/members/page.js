@@ -85,6 +85,9 @@ export default function MembersPage() {
 
     let query = supabase.from('members').select('*', { count: 'exact' });
 
+    // 숨김 회원 제외 (is_active가 false인 회원은 기본적으로 목록에서 제외)
+    query = query.or('is_active.is.null,is_active.eq.true');
+
     // 검색 (이름 + 연락처 + 이메일) — 하이픈 없이 번호 입력해도 검색 가능
     if (search.trim()) {
       const s = search.trim();
@@ -321,7 +324,7 @@ export default function MembersPage() {
       m.email || ''
     ]);
     // 한글 깨짐 방지를 위해 BOM(\uFEFF) 추가
-    const csvContent = "\uFEFF" + [header.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const csvContent = "\uFEFF" + [header.join(','), ...rows.map(r => r.map(v => `"${(v || '').replace(/"/g, '""')}"`).join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

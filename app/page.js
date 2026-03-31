@@ -3,6 +3,7 @@ export const revalidate = 0;
 import { supabase } from '../lib/supabaseClient';
 import DashboardClient from './DashboardClient';
 import RecentCompletions from './RecentCompletions';
+import Link from 'next/link';
 
 export default async function Dashboard() {
   // 모든 쿼리를 병렬 실행하여 로딩 속도 대폭 개선
@@ -17,8 +18,8 @@ export default async function Dashboard() {
     { count: compCount },
     { count: hasPhoneCount },
     { count: thisMonthCount },
-    { data: recent },
     { data: coursesList },
+    { data: recent },
     // completions 릴레이 패치도 병렬 (1000건씩 7개 동시 요청)
     ...completionBatches
   ] = await Promise.all([
@@ -29,8 +30,9 @@ export default async function Dashboard() {
     supabase.from('members').select('*', { count: 'exact', head: true }).not('phone', 'is', null).neq('phone', ''),
     // 이번 달 신규 수료자 수
     supabase.from('completions').select('*', { count: 'exact', head: true }).gte('issued_date', thisMonthStart),
-    // 과정 목록 (차트 클릭 시 이동용)
+    // 과정 목록 (차트 클릭 시 이동용) — 6번째
     supabase.from('courses').select('id, name'),
+    // 최근 발급 10건 — 7번째
     supabase.from('completions')
       .select('id, issued_date, cohort, note, members(name), courses(name)')
       .order('issued_date', { ascending: false, nullsFirst: false })
@@ -66,23 +68,30 @@ export default async function Dashboard() {
   const courseIdMap = {};
   (coursesList || []).forEach(c => { courseIdMap[c.name] = c.id; });
 
+  // 전년 대비 증감률 계산
+  const currentYear = String(now.getFullYear());
+  const lastYear = String(now.getFullYear() - 1);
+  const thisYearCount = yearDist[currentYear] || 0;
+  const lastYearCount = yearDist[lastYear] || 0;
+  const yoyChange = lastYearCount > 0 ? Math.round(((thisYearCount - lastYearCount) / lastYearCount) * 100) : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
       {/* 5 Summary Cards — 상단 3개 + 하단 2개 */}
       <div style={{ display: 'flex', gap: '24px' }}>
-        <div className="card" style={{ flex: 1, borderLeft: '4px solid var(--primary)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <Link href="/members" className="card" style={{ flex: 1, borderLeft: '4px solid var(--primary)', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>총 활성 회원</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>{memberCount?.toLocaleString() || 0} <span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}>명</span></p>
-        </div>
-        <div className="card" style={{ flex: 1, borderLeft: '4px solid #FFBB28', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        </Link>
+        <Link href="/courses" className="card" style={{ flex: 1, borderLeft: '4px solid #FFBB28', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>운영 코칭 과정</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>{courseCount?.toLocaleString() || 0} <span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}>분야</span></p>
-        </div>
-        <div className="card" style={{ flex: 1, borderLeft: '4px solid var(--success)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        </Link>
+        <Link href="/completions" className="card" style={{ flex: 1, borderLeft: '4px solid var(--success)', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>총 누적 발급</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>{compCount?.toLocaleString() || 0} <span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}>건</span></p>
-        </div>
+        </Link>
       </div>
       <div style={{ display: 'flex', gap: '24px' }}>
         <div className="card" style={{ flex: 1, borderLeft: '4px solid #8B5CF6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -98,6 +107,13 @@ export default async function Dashboard() {
             {thisMonthCount?.toLocaleString() || 0}<span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}> 건</span>
           </p>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{now.getFullYear()}년 {now.getMonth() + 1}월 기준</p>
+        </div>
+        <div className="card" style={{ flex: 1, borderLeft: '4px solid #06B6D4', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <h3 style={{ color: 'var(--text-muted)' }}>전년 대비 증감</h3>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px', color: yoyChange > 0 ? '#16a34a' : yoyChange < 0 ? '#dc2626' : '#6b7280' }}>
+            {yoyChange !== null ? (yoyChange > 0 ? '+' : '') + yoyChange + '%' : '-'}
+          </p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{currentYear}년 {thisYearCount}건 / {lastYear}년 {lastYearCount}건</p>
         </div>
       </div>
 

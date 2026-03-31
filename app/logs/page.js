@@ -24,6 +24,8 @@ export default function LogsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState('all');
+  const [targetFilter, setTargetFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [error, setError] = useState(null);
 
   const fetchLogs = useCallback(async () => {
@@ -38,6 +40,12 @@ export default function LogsPage() {
 
     if (actionFilter !== 'all') {
       query = query.eq('action', actionFilter);
+    }
+    if (targetFilter !== 'all') {
+      query = query.eq('target_type', targetFilter);
+    }
+    if (search.trim()) {
+      query = query.ilike('target_name', `%${search.trim()}%`);
     }
 
     query = query.range(from, to);
@@ -56,13 +64,13 @@ export default function LogsPage() {
       setTotalCount(count || 0);
     }
     setLoading(false);
-  }, [page, actionFilter]);
+  }, [page, actionFilter, targetFilter, search]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
 
-  useEffect(() => { setPage(1); }, [actionFilter]);
+  useEffect(() => { setPage(1); }, [actionFilter, targetFilter, search]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
@@ -83,6 +91,20 @@ export default function LogsPage() {
           <option value="hide">숨김</option>
           <option value="backup">백업</option>
         </select>
+        <select value={targetFilter} onChange={e => setTargetFilter(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px' }}>
+          <option value="all">전체 대상</option>
+          <option value="member">회원</option>
+          <option value="course">과정</option>
+          <option value="completion">수료</option>
+        </select>
+        <input type="text" placeholder="이름 검색..." value={search} onChange={e => setSearch(e.target.value)}
+          style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', width: '160px' }} />
+        {(actionFilter !== 'all' || targetFilter !== 'all' || search) && (
+          <button onClick={() => { setActionFilter('all'); setTargetFilter('all'); setSearch(''); }}
+            style={{ padding: '4px 10px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
+            필터 초기화
+          </button>
+        )}
       </div>
 
       <div className="card">
