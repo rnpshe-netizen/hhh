@@ -1,13 +1,28 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+
+const PAGE_SIZE = 50;
 
 export default function MembersPage() {
   const [members, setMembers] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  
+  const [page, setPage] = useState(1);
+
+  // 정렬 상태
+  const [sortField, setSortField] = useState('created_at');
+  const [sortAsc, setSortAsc] = useState(false);
+
+  // 필터 상태
+  const [contactFilter, setContactFilter] = useState('all'); // all | has | none
+  const [rankFilter, setRankFilter] = useState('all'); // all | 1 | 2 | 3
+
+  // 체크박스 선택 상태
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  // 신규 회원 등록 폼
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
@@ -17,7 +32,7 @@ export default function MembersPage() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [memberCompletions, setMemberCompletions] = useState([]);
   const [courses, setCourses] = useState([]);
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -30,6 +45,7 @@ export default function MembersPage() {
 
   // Phase 2A: 매칭 순위 조회용 맵 (이름 → 순위 정보)
   const [matchRankMap, setMatchRankMap] = useState({});
+  const [rankNames, setRankNames] = useState({ 1: [], 2: [], 3: [] });
 
   useEffect(() => {
     supabase.from('courses').select('*').order('created_at').then(({ data }) => setCourses(data || []));
@@ -38,40 +54,156 @@ export default function MembersPage() {
       .then(r => r.json())
       .then(report => {
         const map = {};
-        (report.exactMatch || []).forEach(name => { map[name] = { rank: 1, label: '1순위 완벽일치', color: '#16a34a', bg: '#dcfce7' }; });
-        (report.courseMatch || []).forEach(name => { if (!map[name]) map[name] = { rank: 2, label: '2순위 과정일치', color: '#ca8a04', bg: '#fef9c3' }; });
-        (report.nameOnlyMatch || []).forEach(name => { if (!map[name]) map[name] = { rank: 3, label: '3순위 이름만일치', color: '#dc2626', bg: '#fee2e2' }; });
+        const names = { 1: [], 2: [], 3: [] };
+        (report.exactMatch || []).forEach(name => { map[name] = { rank: 1, label: '1순위 완벽일치', color: '#16a34a', bg: '#dcfce7' }; names[1].push(name); });
+        (report.courseMatch || []).forEach(name => { if (!map[name]) { map[name] = { rank: 2, label: '2순위 과정일치', color: '#ca8a04', bg: '#fef9c3' }; names[2].push(name); } });
+        (report.nameOnlyMatch || []).forEach(name => { if (!map[name]) { map[name] = { rank: 3, label: '3순위 이름만일치', color: '#dc2626', bg: '#fee2e2' }; names[3].push(name); } });
         setMatchRankMap(map);
+        setRankNames(names);
       })
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchMembers = async () => {
-      setLoading(true);
-      if (totalCount === 0) {
-        const { count } = await supabase.from('members').select('*', { count: 'exact', head: true });
-        if (isMounted && count) setTotalCount(count);
-      }
-      let query = supabase.from('members').select('*').order('created_at', { ascending: false }).limit(50);
-      if (search.trim()) {
-        query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
-      }
-      const { data } = await query;
-      if (isMounted) {
-        setMembers(data || []);
-        setLoading(false);
-      }
-    };
-    const timeoutId = setTimeout(() => { fetchMembers(); }, 300);
-    return () => { isMounted = false; clearTimeout(timeoutId); };
-  }, [search, totalCount]);
+  // 회원 목록 조회 (페이지네이션 + 검색 + 정렬 + 필터)
+  const fetchMembers = useCallback(async () => {
+    setLoading(true);
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
-  // Phase 1.5: 엑셀(CSV) 일괄 다운로드
-  const handleExportCSV = () => {
+    let query = supabase.from('members').select('*', { count: 'exact' });
+
+    // 검색 (이름 + 연락처 + 이메일)
+    if (search.trim()) {
+      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    // 연락처 유무 필터
+    if (contactFilter === 'has') {
+      query = query.not('phone', 'is', null).neq('phone', '');
+    } else if (contactFilter === 'none') {
+      query = query.or('phone.is.null,phone.eq.');
+    }
+
+    // 매칭 순위 필터 (해당 순위 이름 목록으로 in 쿼리)
+    if (rankFilter !== 'all') {
+      const names = rankNames[Number(rankFilter)] || [];
+      if (names.length > 0) {
+        query = query.in('name', names);
+      } else {
+        // 해당 순위에 이름이 없으면 빈 결과
+        setMembers([]);
+        setTotalCount(0);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // 정렬
+    query = query.order(sortField, { ascending: sortAsc });
+
+    // 페이지네이션
+    query = query.range(from, to);
+
+    const { data, count } = await query;
+    setMembers(data || []);
+    setTotalCount(count || 0);
+    setSelectedIds(new Set());
+    setLoading(false);
+  }, [page, search, sortField, sortAsc, contactFilter, rankFilter, rankNames]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => { fetchMembers(); }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [fetchMembers]);
+
+  // 페이지 또는 필터 변경 시 페이지 초기화
+  useEffect(() => { setPage(1); }, [search, contactFilter, rankFilter]);
+
+  // 정렬 토글
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+  };
+
+  // 정렬 화살표 표시
+  const sortIcon = (field) => {
+    if (sortField !== field) return ' ↕';
+    return sortAsc ? ' ↑' : ' ↓';
+  };
+
+  // 체크박스: 전체 선택 / 해제
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(new Set(members.map(m => m.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  // 체크박스: 개별 선택
+  const handleSelectOne = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // 일괄 삭제
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`🚨 선택된 ${selectedIds.size}명의 회원을 정말 영구 삭제하시겠습니까?\n관련된 모든 수료 기록도 함께 삭제됩니다!`)) return;
+
+    const ids = [...selectedIds];
+    const { error } = await supabase.from('members').delete().in('id', ids);
+    if (!error) {
+      alert(`${ids.length}명 삭제 완료`);
+      fetchMembers();
+    } else {
+      alert("삭제 실패: " + error.message);
+    }
+  };
+
+  // CSV 전체 추출 (현재 필터/검색 조건에 해당하는 전체 회원)
+  const handleExportCSV = async () => {
+    let allMembers = [];
+    let from = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      let query = supabase.from('members').select('*');
+      if (search.trim()) {
+        query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+      if (contactFilter === 'has') {
+        query = query.not('phone', 'is', null).neq('phone', '');
+      } else if (contactFilter === 'none') {
+        query = query.or('phone.is.null,phone.eq.');
+      }
+      if (rankFilter !== 'all') {
+        const names = rankNames[Number(rankFilter)] || [];
+        if (names.length > 0) query = query.in('name', names);
+        else break;
+      }
+      query = query.order(sortField, { ascending: sortAsc }).range(from, from + batchSize - 1);
+      const { data } = await query;
+      if (!data || data.length === 0) break;
+      allMembers = allMembers.concat(data);
+      if (data.length < batchSize) break;
+      from += batchSize;
+    }
+
     const header = ['이름', '시스템 등록일', '연락처', '이메일'];
-    const rows = members.map(m => [ m.name, new Date(m.created_at).toLocaleDateString(), m.phone || '', m.email || '' ]);
+    const rows = allMembers.map(m => [
+      m.name,
+      new Date(m.created_at).toLocaleDateString(),
+      m.phone || '',
+      m.email || ''
+    ]);
     // 한글 깨짐 방지를 위해 BOM(\uFEFF) 추가
     const csvContent = "\uFEFF" + [header.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -81,6 +213,7 @@ export default function MembersPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    alert(`총 ${allMembers.length}명의 데이터를 CSV로 추출했습니다.`);
   };
 
   const handleAddMember = async () => {
@@ -90,11 +223,10 @@ export default function MembersPage() {
       if (dup && dup.length > 0) return alert("이미 동일한 연락처로 등록된 회원이 있습니다!");
     }
     const { data, error } = await supabase.from('members').insert([{ name: newName, phone: newPhone, email: newEmail }]).select();
-    if (error) { alert("오류 발생: " + error.message); } 
+    if (error) { alert("오류 발생: " + error.message); }
     else if (data) {
-      setMembers([data[0], ...members]);
-      setTotalCount(prev => prev + 1);
       setIsAdding(false); setNewName(''); setNewPhone(''); setNewEmail('');
+      fetchMembers();
     }
   };
 
@@ -133,9 +265,8 @@ export default function MembersPage() {
     if (window.confirm("🚨 [연쇄 삭제 경고]\n이 회원을 정말 영구 삭제하시겠습니까?\n이 회원이 이수한 모든 수료 및 자격증 기록도 함께 우주 끝으로 날아갑니다!!")) {
       const { error } = await supabase.from('members').delete().eq('id', selectedMember.id);
       if (!error) {
-        setMembers(members.filter(m => m.id !== selectedMember.id));
-        setTotalCount(prev => Math.max(0, prev - 1));
         closeMemberDetail();
+        fetchMembers();
       } else {
         alert("삭제 실패: " + error.message);
       }
@@ -161,26 +292,76 @@ export default function MembersPage() {
     }
   };
 
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, totalCount);
+
+  // 페이지 번호 목록 생성 (최대 7개 표시)
+  const getPageNumbers = () => {
+    const pages = [];
+    let start = Math.max(1, page - 3);
+    let end = Math.min(totalPages, start + 6);
+    if (end - start < 6) start = Math.max(1, end - 6);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  };
+
+  const isAllSelected = members.length > 0 && members.every(m => selectedIds.has(m.id));
+
+  const thStyle = { cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' };
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      {/* 상단 헤더: 제목 + 버튼 + 검색 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <h1 style={{ margin: 0 }}>회원 관리 <span style={{fontSize: '18px', color: 'var(--text-muted)'}}>({totalCount.toLocaleString()}명)</span></h1>
           <button onClick={() => setIsAdding(!isAdding)} style={{ padding: '6px 12px', backgroundColor: isAdding ? '#ccc' : 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginLeft: '8px' }}>
             {isAdding ? '작성 취소' : '+ 새 회원 등록'}
           </button>
           <button onClick={handleExportCSV} style={{ padding: '6px 12px', backgroundColor: '#e2e8f0', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}>
-            📥 지정 명단 엑셀(CSV) 추출
+            📥 전체 엑셀(CSV) 추출
           </button>
+          {selectedIds.size > 0 && (
+            <button onClick={handleBulkDelete} style={{ padding: '6px 12px', backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+              🗑️ 선택 삭제 ({selectedIds.size}명)
+            </button>
+          )}
         </div>
-        <input 
-          type="text" placeholder="데이터베이스 서버 검색..." value={search} onChange={(e) => setSearch(e.target.value)}
-          style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '4px', width: '250px' }}
+        <input
+          type="text" placeholder="이름 / 연락처 / 이메일 검색..." value={search} onChange={(e) => setSearch(e.target.value)}
+          style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '4px', width: '280px' }}
         />
       </div>
 
+      {/* 필터 바 */}
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', fontSize: '14px' }}>
+        <span style={{ color: '#6b7280', fontWeight: 'bold' }}>필터:</span>
+        <select value={contactFilter} onChange={e => setContactFilter(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px' }}>
+          <option value="all">연락처: 전체</option>
+          <option value="has">연락처: 있음</option>
+          <option value="none">연락처: 없음</option>
+        </select>
+        <select value={rankFilter} onChange={e => setRankFilter(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px' }}>
+          <option value="all">매칭 순위: 전체</option>
+          <option value="1">🟢 1순위 (완벽일치)</option>
+          <option value="2">🟡 2순위 (과정일치)</option>
+          <option value="3">🔴 3순위 (이름만일치)</option>
+        </select>
+        {(contactFilter !== 'all' || rankFilter !== 'all') && (
+          <button onClick={() => { setContactFilter('all'); setRankFilter('all'); }} style={{ padding: '4px 10px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
+            필터 초기화
+          </button>
+        )}
+        <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '13px' }}>
+          총 {totalCount.toLocaleString()}명 중 {rangeStart}~{rangeEnd} 표시
+        </span>
+      </div>
+
+      {/* 신규 회원 등록 폼 */}
       {isAdding && (
-        <div className="card" style={{ marginBottom: '24px', backgroundColor: '#f8f9fa' }}>
+        <div className="card" style={{ marginBottom: '16px', backgroundColor: '#f8f9fa' }}>
           <h3 style={{ marginBottom: '16px' }}>신규 회원 등록</h3>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <input type="text" placeholder="이름 (필수)" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '8px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} />
@@ -191,38 +372,63 @@ export default function MembersPage() {
         </div>
       )}
 
+      {/* 회원 테이블 */}
       <div className="card">
         {loading ? <p>서버에서 회원 데이터를 찾는 중입니다...</p> : (
           <table>
             <thead>
               <tr>
-                <th>이름</th>
-                <th>시스템 등록일</th>
-                <th>연락처</th>
-                <th>이메일</th>
+                <th style={{ width: '40px', textAlign: 'center' }}>
+                  <input type="checkbox" checked={isAllSelected} onChange={handleSelectAll} title="전체 선택" />
+                </th>
+                <th style={thStyle} onClick={() => handleSort('name')}>이름{sortIcon('name')}</th>
+                <th style={thStyle} onClick={() => handleSort('created_at')}>시스템 등록일{sortIcon('created_at')}</th>
+                <th style={thStyle} onClick={() => handleSort('phone')}>연락처{sortIcon('phone')}</th>
+                <th style={thStyle} onClick={() => handleSort('email')}>이메일{sortIcon('email')}</th>
               </tr>
             </thead>
             <tbody>
               {members.map((m, idx) => (
-                <tr key={m.id || idx} onClick={() => openMemberDetail(m)} style={{ cursor: 'pointer' }} className="member-row">
-                  <td style={{ fontWeight: 500, color: 'var(--primary)' }}>{m.name}</td>
-                  <td style={{ color: 'var(--text-muted)' }}>{m.created_at ? new Date(m.created_at).toLocaleDateString() : '방금 전'}</td>
-                  <td style={{ color: m.phone ? 'var(--text-main)' : '#ccc' }}>{m.phone || '-'}</td>
-                  <td style={{ color: m.email ? 'var(--text-main)' : '#ccc' }}>{m.email || '-'}</td>
+                <tr key={m.id || idx} className="member-row" style={{ cursor: 'pointer' }}>
+                  <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => handleSelectOne(m.id)} />
+                  </td>
+                  <td style={{ fontWeight: 500, color: 'var(--primary)' }} onClick={() => openMemberDetail(m)}>{m.name}</td>
+                  <td style={{ color: 'var(--text-muted)' }} onClick={() => openMemberDetail(m)}>{m.created_at ? new Date(m.created_at).toLocaleDateString() : '방금 전'}</td>
+                  <td style={{ color: m.phone ? 'var(--text-main)' : '#ccc' }} onClick={() => openMemberDetail(m)}>{m.phone || '-'}</td>
+                  <td style={{ color: m.email ? 'var(--text-main)' : '#ccc' }} onClick={() => openMemberDetail(m)}>{m.email || '-'}</td>
                 </tr>
               ))}
-              {members.length === 0 && <tr><td colSpan="4" style={{textAlign: 'center', padding: '24px'}}>검색 결과가 없습니다.</td></tr>}
+              {members.length === 0 && <tr><td colSpan="5" style={{textAlign: 'center', padding: '24px'}}>검색 결과가 없습니다.</td></tr>}
             </tbody>
           </table>
         )}
         <style jsx>{`.member-row:hover td { background-color: #f1f8ff; }`}</style>
+
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+            <button onClick={() => setPage(1)} disabled={page === 1} style={pgBtnStyle(page === 1)}>«</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={pgBtnStyle(page === 1)}>‹</button>
+            {getPageNumbers().map(p => (
+              <button key={p} onClick={() => setPage(p)} style={{
+                ...pgBtnStyle(false),
+                backgroundColor: p === page ? 'var(--primary)' : '#fff',
+                color: p === page ? '#fff' : '#374151',
+                fontWeight: p === page ? 'bold' : 'normal',
+              }}>{p}</button>
+            ))}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={pgBtnStyle(page === totalPages)}>›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={pgBtnStyle(page === totalPages)}>»</button>
+          </div>
+        )}
       </div>
 
       {/* 회원 상세 & 수료증 수동 발급 관리 모달 */}
       {selectedMember && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ backgroundColor: '#fff', padding: '32px', borderRadius: '8px', width: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
-            
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #eee', paddingBottom: '16px', marginBottom: '24px' }}>
               <div>
                 <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>{selectedMember.name} 님의 기록 상세 <span style={{fontSize: '14px', color:'gray', fontWeight: 'normal'}}>({memberCompletions.length}건 수료)</span></h2>
@@ -239,7 +445,7 @@ export default function MembersPage() {
                   {isEditing ? '취소' : '수정하기'}
                 </button>
               </div>
-              
+
               {/* Phase 2A 매칭 순위 뱃지 */}
               {matchRankMap[selectedMember.name] && (
                 <div style={{ marginBottom: '12px' }}>
@@ -326,4 +532,19 @@ export default function MembersPage() {
       )}
     </div>
   );
+}
+
+// 페이지네이션 버튼 스타일
+function pgBtnStyle(disabled) {
+  return {
+    padding: '6px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    backgroundColor: disabled ? '#f9fafb' : '#fff',
+    color: disabled ? '#d1d5db' : '#374151',
+    cursor: disabled ? 'default' : 'pointer',
+    fontSize: '14px',
+    minWidth: '36px',
+    textAlign: 'center',
+  };
 }
