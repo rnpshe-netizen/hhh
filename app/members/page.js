@@ -76,14 +76,18 @@ export default function MembersPage() {
     if (search.trim()) {
       const s = search.trim();
       const digitsOnly = s.replace(/[^0-9]/g, '');
-      // 숫자만 포함된 검색어(전화번호)인 경우, 하이픈 포함/미포함 모두 검색
+      // 숫자만 포함된 검색어 → 하이픈 자동 삽입해서 부분 검색 지원
+      // 예: "0104809" → "010-4809%" 로 DB의 "010-4809-9978" 매칭
       if (digitsOnly.length >= 3 && digitsOnly === s.replace(/[-\s]/g, '')) {
-        const formatted = digitsOnly.replace(/^(01[016789])(\d{3,4})(\d{4})$/, '$1-$2-$3');
-        if (formatted !== digitsOnly) {
-          query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,phone.ilike.%${formatted}%,email.ilike.%${s}%`);
+        let withHyphen = digitsOnly;
+        if (digitsOnly.length <= 3) {
+          withHyphen = digitsOnly;
+        } else if (digitsOnly.length <= 7) {
+          withHyphen = digitsOnly.slice(0, 3) + '-' + digitsOnly.slice(3);
         } else {
-          query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,phone.ilike.%${digitsOnly}%,email.ilike.%${s}%`);
+          withHyphen = digitsOnly.slice(0, 3) + '-' + digitsOnly.slice(3, 7) + '-' + digitsOnly.slice(7);
         }
+        query = query.or(`name.ilike.%${s}%,phone.ilike.%${withHyphen}%,phone.ilike.%${digitsOnly}%,email.ilike.%${s}%`);
       } else {
         query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
       }
