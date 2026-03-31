@@ -4,32 +4,33 @@ export function proxy(req) {
   const basicAuth = req.headers.get('authorization');
   const url = req.nextUrl;
 
-  // Next.js 정적 파일 및 내부 라우팅 요청은 인증 없이 통과
+  // Next.js 내부 요청은 인증 없이 통과
+  // 1) 정적 파일 (JS, CSS, 이미지 등)
   if (url.pathname.startsWith('/_next/') || url.pathname === '/favicon.ico') {
     return NextResponse.next();
   }
-
-  // RSC(React Server Components) 내부 네비게이션 요청은 인증 없이 통과
-  // 브라우저가 이미 Basic Auth를 통과한 상태에서 클라이언트 라우팅 시 발생하는 fetch 요청
-  if (req.headers.get('rsc') || req.headers.get('next-router-state-tree')) {
+  // 2) RSC 내부 네비게이션 fetch — 다양한 헤더로 감지
+  const isRSC = req.headers.get('rsc') === '1'
+    || req.headers.get('next-router-state-tree')
+    || req.headers.get('next-url')
+    || req.headers.get('purpose') === 'prefetch'
+    || req.headers.get('x-nextjs-data');
+  if (isRSC) {
     return NextResponse.next();
   }
 
   if (basicAuth) {
     const authValue = basicAuth.split(' ')[1];
-    // Base64 디코딩 (Edge 런타임에서는 atob 사용 가능)
     const [user, pwd] = atob(authValue).split(':');
 
-    // .env 파일의 환경설정을 우선 사용하고, 없으면 기본값(admin / admin123!) 사용
     const validUser = process.env.BASIC_AUTH_USER || 'admin';
     const validPwd = process.env.BASIC_AUTH_PASSWORD || 'admin123!';
 
     if (user === validUser && pwd === validPwd) {
-      return NextResponse.next(); // 인증 성공
+      return NextResponse.next();
     }
   }
 
-  // 인증 실패 혹은 미인증 상태 -> 브라우저 기본 로그인 팝업 호출
   return new NextResponse('Authentication required.', {
     status: 401,
     headers: {
@@ -38,7 +39,9 @@ export function proxy(req) {
   });
 }
 
-// 이 미들웨어가 적용될 경로 (모든 경로 통제)
+// 정적 파일·이미지 최적화 경로는 아예 미들웨어 실행 제외
 export const config = {
-  matcher: '/:path*',
+  matcher: [
+    '/((?!_next/static|_next/image|favicon\\.ico|logo\\.png|matching_report\\.json).*)',
+  ],
 };
