@@ -22,11 +22,15 @@ export default function CoursesPage() {
   useEffect(() => {
     async function load() {
       // 과정 목록 + 수료 통계를 병렬로 조회
-      const [{ data: coursesData }, { data: completionsData }] = await Promise.all([
+      // Supabase 기본 1,000건 제한 회피를 위해 릴레이 패치
+      const [{ data: coursesData }, ...completionBatches] = await Promise.all([
         supabase.from('courses').select('*').order('created_at', { ascending: true }),
-        supabase.from('completions').select('course_id, issued_date'),
+        ...[0, 1000, 2000, 3000, 4000, 5000, 6000].map(offset =>
+          supabase.from('completions').select('course_id, issued_date').range(offset, offset + 999)
+        ),
       ]);
 
+      const completionsData = completionBatches.flatMap(b => b.data || []);
       setCourses(coursesData || []);
 
       // 과정별 수료자 수 및 최근 발급일 계산
