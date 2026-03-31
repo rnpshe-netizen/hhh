@@ -4,8 +4,14 @@ export function proxy(req) {
   const basicAuth = req.headers.get('authorization');
   const url = req.nextUrl;
 
-  // Next.js 정적 파일(JS, CSS, 이미지 등)은 인증 없이 통과
+  // Next.js 정적 파일 및 내부 라우팅 요청은 인증 없이 통과
   if (url.pathname.startsWith('/_next/') || url.pathname === '/favicon.ico') {
+    return NextResponse.next();
+  }
+
+  // RSC(React Server Components) 내부 네비게이션 요청은 인증 없이 통과
+  // 브라우저가 이미 Basic Auth를 통과한 상태에서 클라이언트 라우팅 시 발생하는 fetch 요청
+  if (req.headers.get('rsc') || req.headers.get('next-router-state-tree')) {
     return NextResponse.next();
   }
 
