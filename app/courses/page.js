@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { logActivity } from '../../lib/activityLog';
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState([]);
@@ -58,6 +59,7 @@ export default function CoursesPage() {
         alert("오류 발생: " + error.message);
       }
     } else if (data) {
+      logActivity({ action: 'create', targetType: 'course', targetId: data[0].id, targetName: newName, details: `신규 과정 등록 (${newCat})` });
       setCourses([...courses, data[0]]);
       setIsAdding(false);
       setNewName(''); setNewDesc(''); setNewCat('수료증');
@@ -73,7 +75,26 @@ export default function CoursesPage() {
       if (error) {
         alert("업데이트 실패: " + error.message);
       } else {
+        logActivity({ action: 'hide', targetType: 'course', targetId: course.id, targetName: course.name, details: actionTxt });
         setCourses(courses.map(c => c.id === course.id ? { ...c, is_active: newState } : c));
+      }
+    }
+  };
+
+  // 과정 영구 삭제 (연쇄 삭제 경고)
+  const handleDeleteCourse = async (course) => {
+    const stat = courseStats[course.id] || { count: 0 };
+    const msg = stat.count > 0
+      ? `🚨 [연쇄 삭제 경고]\n"${course.name}" 과정을 영구 삭제하시겠습니까?\n\n이 과정에 연결된 수료 기록 ${stat.count}건도 함께 삭제됩니다!\n\n💡 삭제 대신 [숨김]을 사용하면 기록을 보존할 수 있습니다.`
+      : `"${course.name}" 과정을 영구 삭제하시겠습니까?`;
+
+    if (window.confirm(msg)) {
+      const { error } = await supabase.from('courses').delete().eq('id', course.id);
+      if (!error) {
+        logActivity({ action: 'delete', targetType: 'course', targetId: course.id, targetName: course.name, details: `과정 영구 삭제 (수료 ${stat.count}건 연쇄 삭제)` });
+        setCourses(courses.filter(c => c.id !== course.id));
+      } else {
+        alert("삭제 실패: " + error.message);
       }
     }
   };
@@ -95,6 +116,8 @@ export default function CoursesPage() {
     if (error) {
       alert("수정 실패: " + error.message);
     } else {
+      const oldCourse = courses.find(c => c.id === courseId);
+      logActivity({ action: 'update', targetType: 'course', targetId: courseId, targetName: editName, details: `과정명: ${oldCourse?.name}→${editName}` });
       setCourses(courses.map(c => c.id === courseId ? { ...c, name: editName, category: editCat, description: editDesc } : c));
       setEditingId(null);
     }
@@ -204,6 +227,11 @@ export default function CoursesPage() {
                             </button>
                             <button onClick={() => handleToggleActive(c)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff' }}>
                               {c.is_active === false ? '👁️ 해제' : '🙈 숨김'}
+                            </button>
+                            <button onClick={() => handleDeleteCourse(c)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#dc2626', opacity: 0.5 }}
+                              onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                              onMouseLeave={e => e.currentTarget.style.opacity = 0.5}>
+                              🗑️
                             </button>
                           </>
                         )}

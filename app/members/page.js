@@ -256,8 +256,10 @@ export default function MembersPage() {
     if (!window.confirm(`🚨 선택된 ${selectedIds.size}명의 회원을 정말 영구 삭제하시겠습니까?\n관련된 모든 수료 기록도 함께 삭제됩니다!`)) return;
 
     const ids = [...selectedIds];
+    const deletedNames = members.filter(m => ids.includes(m.id)).map(m => m.name);
     const { error } = await supabase.from('members').delete().in('id', ids);
     if (!error) {
+      logActivity({ action: 'delete', targetType: 'member', targetName: `${ids.length}명 일괄`, details: `일괄 삭제: ${deletedNames.slice(0, 5).join(', ')}${deletedNames.length > 5 ? ' 외 ' + (deletedNames.length - 5) + '명' : ''}` });
       alert(`${ids.length}명 삭제 완료`);
       fetchMembers();
     } else {
@@ -339,6 +341,7 @@ export default function MembersPage() {
     const { data, error } = await supabase.from('members').insert([{ name: newName, phone: newPhone, email: newEmail }]).select();
     if (error) { alert("오류 발생: " + error.message); }
     else if (data) {
+      logActivity({ action: 'create', targetType: 'member', targetId: data[0].id, targetName: newName, details: `신규 회원 등록 (연락처: ${newPhone || '없음'})` });
       setIsAdding(false); setNewName(''); setNewPhone(''); setNewEmail('');
       fetchMembers();
     }
@@ -440,6 +443,8 @@ export default function MembersPage() {
     const payload = { member_id: selectedMember.id, course_id: issueCourseId, issued_date: issueDate || null, cohort: issueCohort || null };
     const { data, error } = await supabase.from('completions').insert([payload]).select('id, issued_date, cohort, courses(id, name)');
     if (!error) {
+      const courseName = data[0]?.courses?.name || '';
+      logActivity({ action: 'create', targetType: 'completion', targetId: data[0].id, targetName: selectedMember.name, details: `${courseName} 수료 발급 (기수: ${issueCohort || '-'})` });
       setMemberCompletions([data[0], ...memberCompletions]);
       setIssueCourseId(''); setIssueDate(''); setIssueCohort('');
     } else {
@@ -449,7 +454,9 @@ export default function MembersPage() {
 
   const handleDeleteCompletion = async (compId) => {
     if (window.confirm("이 수료 기록만 취소(삭제) 하시겠습니까?")) {
+      const comp = memberCompletions.find(c => c.id === compId);
       await supabase.from('completions').delete().eq('id', compId);
+      logActivity({ action: 'delete', targetType: 'completion', targetId: compId, targetName: selectedMember.name, details: `${comp?.courses?.name || '과정'} 수료 취소` });
       setMemberCompletions(memberCompletions.filter(c => c.id !== compId));
     }
   };
