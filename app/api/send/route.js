@@ -1,9 +1,15 @@
-// 메시지 발송 API — 솔라피(카카오+SMS) + Resend(이메일)
+// 메시지 발송 API — 솔라피 REST API(카카오+SMS) + Resend SDK(이메일)
 import { NextResponse } from 'next/server';
-import solapi from 'solapi';
 import { Resend } from 'resend';
+import crypto from 'crypto';
 
-const { SolapiMessageService } = solapi;
+// 솔라피 HMAC 인증 헤더 생성
+function getSolapiAuthHeader(apiKey, apiSecret) {
+  const date = new Date().toISOString();
+  const salt = crypto.randomBytes(32).toString('hex');
+  const signature = crypto.createHmac('sha256', apiSecret).update(date + salt).digest('hex');
+  return `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+}
 
 export async function POST(request) {
   try {
@@ -15,52 +21,57 @@ export async function POST(request) {
 
     const results = [];
 
-    // 카카오 알림톡 또는 SMS — 솔라피 사용
+    // 카카오 알림톡 또는 SMS — 솔라피 REST API 직접 호출
     if (channel === 'kakao' || channel === 'sms') {
       const apiKey = process.env.SOLAPI_API_KEY;
       const apiSecret = process.env.SOLAPI_API_SECRET;
-      const senderPhone = process.env.SOLAPI_SENDER_PHONE; // 발신번호 (솔라피에서 등록한 번호)
+      const senderPhone = process.env.SOLAPI_SENDER_PHONE;
 
-      if (!apiKey || !apiSecret) {
-        return NextResponse.json({ error: '솔라피 API 키가 설정되지 않았습니다. Vercel 환경변수에 SOLAPI_API_KEY, SOLAPI_API_SECRET을 추가하세요.' }, { status: 500 });
+      if (!apiKey || !apiSecret || !senderPhone) {
+        return NextResponse.json({
+          error: '솔라피 환경변수 미설정. SOLAPI_API_KEY, SOLAPI_API_SECRET, SOLAPI_SENDER_PHONE 필요.'
+        }, { status: 500 });
       }
 
-      const messageService = new SolapiMessageService(apiKey, apiSecret);
+      const authorization = getSolapiAuthHeader(apiKey, apiSecret);
 
-      // 한 번에 최대 10,000건 발송 가능
-      const messages = recipients.map(r => {
-        if (channel === 'kakao') {
-          // 카카오 알림톡 (템플릿 ID 필요 — 솔라피 대시보드에서 등록)
-          return {
-            to: r.phone.replace(/-/g, ''),
-            from: senderPhone,
-            text: body,
-            type: 'ATA', // 알림톡
-            // kakaoOptions: { pfId: process.env.SOLAPI_KAKAO_PFID, templateId: 'TEMPLATE_ID' },
-            // 알림톡 템플릿 미등록 시 SMS로 대체 발송
-          };
-        } else {
-          // SMS/LMS
-          const byteLength = new TextEncoder().encode(body).length;
-          return {
-            to: r.phone.replace(/-/g, ''),
-            from: senderPhone,
-            text: body,
-            type: byteLength > 90 ? 'LMS' : 'SMS',
-          };
-        }
-      });
+      // 메시지 구성
+      const messages = recipients.map(r => ({
+        to: r.phone.replace(/-/g, ''),
+        from: senderPhone.replace(/-/g, ''),
+        text: body,
+        ...(channel === 'kakao' ? { type: 'ATA' } : {}),
+      }));
 
-      // 500건씩 나눠서 발송
+      // 500건씩 배치 발송
       for (let i = 0; i < messages.length; i += 500) {
         const batch = messages.slice(i, i + 500);
         try {
-          const response = await messageService.send(batch);
-          results.push({
-            batch: Math.floor(i / 500) + 1,
-            success: response.groupInfo?.successCount || batch.length,
-            fail: response.groupInfo?.failCount || 0,
+          const res = await fetch('https://api.solapi.com/messages/v4/send-many', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authorization,
+            },
+            body: JSON.stringify({ messages: batch }),
           });
+          const data = await res.json();
+
+          if (data.groupInfo) {
+            results.push({
+              batch: Math.floor(i / 500) + 1,
+              success: data.groupInfo.successCount || 0,
+              fail: data.groupInfo.failCount || 0,
+            });
+          } else {
+            // 에러 응답
+            results.push({
+              batch: Math.floor(i / 500) + 1,
+              success: 0,
+              fail: batch.length,
+              error: data.errorCode || data.errorMessage || JSON.stringify(data),
+            });
+          }
         } catch (err) {
           results.push({
             batch: Math.floor(i / 500) + 1,
@@ -72,18 +83,18 @@ export async function POST(request) {
       }
     }
 
-    // 이메일 — Resend 사용
+    // 이메일 — Resend SDK
     if (channel === 'email') {
       const resendKey = process.env.RESEND_API_KEY;
       const senderEmail = process.env.RESEND_SENDER_EMAIL || 'onboarding@resend.dev';
 
       if (!resendKey) {
-        return NextResponse.json({ error: 'Resend API 키가 설정되지 않았습니다. Vercel 환경변수에 RESEND_API_KEY를 추가하세요.' }, { status: 500 });
+        return NextResponse.json({ error: 'RESEND_API_KEY 환경변수 미설정.' }, { status: 500 });
       }
 
       const resend = new Resend(resendKey);
 
-      // Resend는 건당 발송 (배치 API 없음), 500건씩 처리
+      // 50건씩 병렬 발송
       for (let i = 0; i < recipients.length; i += 50) {
         const batch = recipients.slice(i, i + 50);
         const promises = batch.map(r =>
@@ -106,7 +117,6 @@ export async function POST(request) {
       }
     }
 
-    // 전체 결과 집계
     const totalSuccess = results.reduce((sum, r) => sum + r.success, 0);
     const totalFail = results.reduce((sum, r) => sum + r.fail, 0);
 
