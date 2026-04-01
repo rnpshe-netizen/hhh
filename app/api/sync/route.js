@@ -43,7 +43,7 @@ export async function POST(request) {
     // 구글 시트 데이터 읽기 (A:N 범위)
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: "Responses!A:N",
+      range: "Form_Responses!A:N",
     });
 
     const rows = response.data.values;
@@ -128,7 +128,7 @@ export async function POST(request) {
       try {
         await sheets.spreadsheets.values.update({
           spreadsheetId: sheetId,
-          range: `Responses!N${rowNum}`,
+          range: `Form_Responses!N${rowNum}`,
           valueInputOption: 'RAW',
           requestBody: { values: [['TRUE']] },
         });
