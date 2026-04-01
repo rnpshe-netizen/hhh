@@ -107,23 +107,48 @@ export default function MessagesPage() {
       return;
     }
 
-    // 개별 발송 기록 생성
+    // 실제 발송 API 호출
+    const recipients = sendable.map(m => ({
+      phone: m.phone,
+      email: m.email,
+      name: m.name,
+    }));
+
+    let apiResult = { totalSuccess: 0, totalFail: sendable.length };
+    try {
+      const res = await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel, recipients, subject, body }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        apiResult = { totalSuccess: data.totalSuccess, totalFail: data.totalFail };
+      } else {
+        // API 키 미설정 등 에러 시 기록만 저장 (발송은 실패 처리)
+        console.log('발송 API 에러:', data.error);
+      }
+    } catch (err) {
+      console.log('발송 API 호출 실패:', err.message);
+    }
+
+    // 개별 발송 기록 DB 저장
     const logs = sendable.map(m => ({
       campaign_id: campaign.id,
       member_id: m.id,
       member_name: m.name,
       channel,
       recipient: channel === 'email' ? m.email : m.phone,
-      status: 'sent', // 실제 API 연동 시 pending → sent/failed 로 변경
+      status: apiResult.totalSuccess > 0 ? 'sent' : 'pending',
     }));
 
-    // 500건씩 배치 삽입
     let successCount = 0;
     for (let i = 0; i < logs.length; i += 500) {
       const chunk = logs.slice(i, i + 500);
       const { error } = await supabase.from('message_logs').insert(chunk);
       if (!error) successCount += chunk.length;
     }
+    successCount = apiResult.totalSuccess || successCount;
 
     // 캠페인 상태 업데이트
     await supabase.from('message_campaigns').update({
