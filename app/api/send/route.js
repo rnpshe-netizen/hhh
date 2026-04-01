@@ -1,6 +1,5 @@
 // 메시지 발송 API — 솔라피 REST API(카카오+SMS) + Resend SDK(이메일)
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
 import crypto from 'crypto';
 
 // 솔라피 HMAC 인증 헤더 생성
@@ -92,6 +91,7 @@ export async function POST(request) {
         return NextResponse.json({ error: 'RESEND_API_KEY 환경변수 미설정.' }, { status: 500 });
       }
 
+      const { Resend } = await import('resend');
       const resend = new Resend(resendKey);
 
       // 50건씩 병렬 발송
