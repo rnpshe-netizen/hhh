@@ -41,10 +41,21 @@ export async function POST(request) {
     const auth = getGoogleAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // 구글 시트 데이터 읽기 (A:N 범위)
+    // 디버그: 먼저 스프레드시트 메타데이터로 시트 목록 확인
+    let sheetNames = [];
+    try {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+      sheetNames = meta.data.sheets.map(s => s.properties.title);
+    } catch (metaErr) {
+      return NextResponse.json({ error: '시트 접근 실패: ' + metaErr.message, sheetId, sheetTab }, { status: 500 });
+    }
+
+    // 실제 시트 탭 이름으로 자동 매칭 (정확한 이름 사용)
+    const actualTab = sheetNames.find(n => n === sheetTab) || sheetNames[0];
+
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${sheetTab}!A:N`,
+      range: `${actualTab}!A:N`,
     });
 
     const rows = response.data.values;
@@ -129,7 +140,7 @@ export async function POST(request) {
       try {
         await sheets.spreadsheets.values.update({
           spreadsheetId: sheetId,
-          range: `${sheetTab}!N${rowNum}`,
+          range: `${actualTab}!N${rowNum}`,
           valueInputOption: 'RAW',
           requestBody: { values: [['TRUE']] },
         });
