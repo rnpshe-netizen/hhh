@@ -4,7 +4,11 @@ export function proxy(req) {
   const basicAuth = req.headers.get('authorization');
   const url = req.nextUrl;
 
-  // Next.js 내부 요청은 인증 없이 통과
+  // 인증 없이 통과하는 경로
+  // 0) 내부 API 라우트 (서버 간 호출 + 클라이언트 fetch)
+  if (url.pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
   // 1) 정적 파일 (JS, CSS, 이미지 등)
   if (url.pathname.startsWith('/_next/') || url.pathname === '/favicon.ico') {
     return NextResponse.next();
