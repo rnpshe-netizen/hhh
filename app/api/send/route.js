@@ -54,7 +54,9 @@ export async function POST(request) {
             },
             body: JSON.stringify({ messages: batch }),
           });
-          const data = await res.json();
+          const rawText = await res.text();
+          let data;
+          try { data = JSON.parse(rawText); } catch { data = { rawText }; }
 
           if (data.groupInfo) {
             results.push({
@@ -68,7 +70,8 @@ export async function POST(request) {
               batch: Math.floor(i / 500) + 1,
               success: 0,
               fail: batch.length,
-              error: data.errorCode || data.errorMessage || JSON.stringify(data),
+              error: data.errorCode || data.errorMessage || data.rawText || JSON.stringify(data),
+              httpStatus: res.status,
             });
           }
         } catch (err) {
