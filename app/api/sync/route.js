@@ -43,7 +43,7 @@ export async function POST(request) {
     // 구글 시트 데이터 읽기 (A:N 범위)
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: '국제코칭훈련원 수강 신청서 (응답)!A:N', // 시트 이름이 '응답'이 아닌 경우 조정 필요
+      range: ''국제코칭훈련원 수강 신청서 (응답)'!A:N', // 시트 이름이 '응답'이 아닌 경우 조정 필요
     });
 
     const rows = response.data.values;
