@@ -41,6 +41,7 @@ export default function MembersPage() {
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editMemo, setEditMemo] = useState('');
 
   // Phase 1.5: 수동 수료(발급) 연결 폼 상태
   const [issueCourseId, setIssueCourseId] = useState('');
@@ -354,7 +355,7 @@ export default function MembersPage() {
   const openMemberDetail = async (member) => {
     setSelectedMember(member);
     setIsEditing(false);
-    setEditName(member.name); setEditPhone(member.phone || ''); setEditEmail(member.email || '');
+    setEditName(member.name); setEditPhone(member.phone || ''); setEditEmail(member.email || ''); setEditMemo(member.memo || '');
     const { data } = await supabase.from('completions').select('id, issued_date, cohort, note, courses(id, name)').eq('member_id', member.id).order('issued_date', { ascending: false });
     setMemberCompletions(data || []);
   };
@@ -396,11 +397,11 @@ export default function MembersPage() {
       const { data: dup } = await supabase.from('members').select('id').eq('phone', editPhone.trim()).neq('id', selectedMember.id).limit(1);
       if (dup && dup.length > 0) return alert("이미 동일한 연락처를 사용하는 다른 회원이 있습니다.");
     }
-    const { error } = await supabase.from('members').update({ name: editName, phone: editPhone, email: editEmail }).eq('id', selectedMember.id);
+    const { error } = await supabase.from('members').update({ name: editName, phone: editPhone, email: editEmail, memo: editMemo || null }).eq('id', selectedMember.id);
     if (!error) {
       logActivity({ action: 'update', targetType: 'member', targetId: selectedMember.id, targetName: editName, details: `이름: ${selectedMember.name}→${editName}, 연락처: ${selectedMember.phone||'없음'}→${editPhone||'없음'}` });
-      setMembers(members.map(m => m.id === selectedMember.id ? { ...m, name: editName, phone: editPhone, email: editEmail } : m));
-      setSelectedMember({ ...selectedMember, name: editName, phone: editPhone, email: editEmail });
+      setMembers(members.map(m => m.id === selectedMember.id ? { ...m, name: editName, phone: editPhone, email: editEmail, memo: editMemo } : m));
+      setSelectedMember({ ...selectedMember, name: editName, phone: editPhone, email: editEmail, memo: editMemo });
       setIsEditing(false);
       alert("정보가 성공적으로 수정되었습니다.");
     } else {
@@ -669,6 +670,8 @@ export default function MembersPage() {
                     onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
                   <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="이메일 (예: abc@email.com)" style={{ padding: '8px' }}
                     onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
+                  <textarea value={editMemo} onChange={e => setEditMemo(e.target.value)} placeholder="메모 (내부 참고용)" rows={2}
+                    style={{ padding: '8px', resize: 'vertical', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px' }} />
                   <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                     <button onClick={handleUpdateMember} style={{ flex: 1, padding: '10px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>저장하기</button>
                     <button onClick={handleHideMember} style={{ padding: '10px 20px', background: '#fef3c7', color: '#92400e', border: '1px solid #fbbf24', borderRadius: '4px', cursor: 'pointer' }}>숨기기</button>
@@ -679,6 +682,11 @@ export default function MembersPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   <div><strong>연락처:</strong> <span style={{color: selectedMember.phone ? 'black' : 'gray'}}>{selectedMember.phone || '없음'}</span></div>
                   <div><strong>이메일:</strong> <span style={{color: selectedMember.email ? 'black' : 'gray'}}>{selectedMember.email || '없음'}</span></div>
+                  {selectedMember.memo && (
+                    <div style={{ gridColumn: '1 / -1', marginTop: '4px' }}>
+                      <strong>메모:</strong> <span style={{ color: '#6b7280', fontSize: '13px' }}>{selectedMember.memo}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
