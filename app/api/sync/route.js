@@ -30,6 +30,7 @@ function formatPhone(phone) {
 export async function POST(request) {
   try {
     const sheetId = process.env.GOOGLE_SHEET_ID;
+    const sheetTab = process.env.GOOGLE_SHEET_TAB || 'Form_Responses';
     if (!sheetId) {
       return NextResponse.json({ error: 'GOOGLE_SHEET_ID 환경변수가 설정되지 않았습니다.' }, { status: 500 });
     }
@@ -43,7 +44,7 @@ export async function POST(request) {
     // 구글 시트 데이터 읽기 (A:N 범위)
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: "Form_Responses!A:N",
+      range: `${sheetTab}!A:N`,
     });
 
     const rows = response.data.values;
@@ -128,7 +129,7 @@ export async function POST(request) {
       try {
         await sheets.spreadsheets.values.update({
           spreadsheetId: sheetId,
-          range: `Form_Responses!N${rowNum}`,
+          range: `${sheetTab}!N${rowNum}`,
           valueInputOption: 'RAW',
           requestBody: { values: [['TRUE']] },
         });
