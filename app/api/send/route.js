@@ -1,7 +1,9 @@
 // 메시지 발송 API — 솔라피(카카오+SMS) + Resend(이메일)
 import { NextResponse } from 'next/server';
-import { SolapiMessageService } from 'solapi';
+import solapi from 'solapi';
 import { Resend } from 'resend';
+
+const { SolapiMessageService } = solapi;
 
 export async function POST(request) {
   try {
