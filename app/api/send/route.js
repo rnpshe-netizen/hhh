@@ -58,19 +58,19 @@ export async function POST(request) {
           let data;
           try { data = JSON.parse(rawText); } catch { data = { rawText }; }
 
-          if (data.groupInfo) {
+          if (res.ok && data.count) {
+            // 솔라피 정상 응답 — count.registeredSuccess로 성공 건수 파악
             results.push({
               batch: Math.floor(i / 500) + 1,
-              success: data.groupInfo.successCount || 0,
-              fail: data.groupInfo.failCount || 0,
+              success: data.count.registeredSuccess || 0,
+              fail: data.count.registeredFailed || 0,
             });
           } else {
-            // 에러 응답
             results.push({
               batch: Math.floor(i / 500) + 1,
               success: 0,
               fail: batch.length,
-              error: data.errorCode || data.errorMessage || data.rawText || JSON.stringify(data),
+              error: data.errorCode || data.errorMessage || JSON.stringify(data).slice(0, 200),
               httpStatus: res.status,
             });
           }
