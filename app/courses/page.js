@@ -13,12 +13,16 @@ export default function CoursesPage() {
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState('수료증');
   const [newDesc, setNewDesc] = useState('');
+  const [newHours, setNewHours] = useState('');
+  const [newPrice, setNewPrice] = useState('');
 
   // 과정 수정 상태
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editCat, setEditCat] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [editHours, setEditHours] = useState(0);
+  const [editPrice, setEditPrice] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -51,7 +55,7 @@ export default function CoursesPage() {
 
   const handleAddCourse = async () => {
     if (!newName.trim()) return alert("과정명을 입력해주세요.");
-    const { data, error } = await supabase.from('courses').insert([{ name: newName, category: newCat, description: newDesc, is_active: true }]).select();
+    const { data, error } = await supabase.from('courses').insert([{ name: newName, category: newCat, description: newDesc, hours: Number(newHours) || 0, price: Number(newPrice) || 0, is_active: true }]).select();
     if (error) {
       if (error.message.includes('column "is_active"')) {
         alert("⚠️ 시스템 알림: 아직 데이터베이스에 '숨김' 기능(is_active) 세팅이 완료되지 않았습니다!\n\nSupabase에서 [scripts/alter-courses.sql] 명령어를 먼저 실행해주세요.");
@@ -62,7 +66,7 @@ export default function CoursesPage() {
       logActivity({ action: 'create', targetType: 'course', targetId: data[0].id, targetName: newName, details: `신규 과정 등록 (${newCat})` });
       setCourses([...courses, data[0]]);
       setIsAdding(false);
-      setNewName(''); setNewDesc(''); setNewCat('수료증');
+      setNewName(''); setNewDesc(''); setNewCat('수료증'); setNewHours(''); setNewPrice('');
     }
   };
 
@@ -105,20 +109,22 @@ export default function CoursesPage() {
     setEditName(course.name);
     setEditCat(course.category);
     setEditDesc(course.description || '');
+    setEditHours(course.hours || 0);
+    setEditPrice(course.price || 0);
   };
 
   // 과정 수정 저장
   const handleSaveEdit = async (courseId) => {
     if (!editName.trim()) return alert("과정명을 입력해주세요.");
     const { error } = await supabase.from('courses')
-      .update({ name: editName, category: editCat, description: editDesc })
+      .update({ name: editName, category: editCat, description: editDesc, hours: editHours || 0, price: editPrice || 0 })
       .eq('id', courseId);
     if (error) {
       alert("수정 실패: " + error.message);
     } else {
       const oldCourse = courses.find(c => c.id === courseId);
       logActivity({ action: 'update', targetType: 'course', targetId: courseId, targetName: editName, details: `과정명: ${oldCourse?.name}→${editName}` });
-      setCourses(courses.map(c => c.id === courseId ? { ...c, name: editName, category: editCat, description: editDesc } : c));
+      setCourses(courses.map(c => c.id === courseId ? { ...c, name: editName, category: editCat, description: editDesc, hours: editHours, price: editPrice } : c));
       setEditingId(null);
     }
   };
@@ -144,6 +150,8 @@ export default function CoursesPage() {
               <option value="수료증">수료증 과정</option>
               <option value="자격증">자격증 과정</option>
             </select>
+            <input type="number" placeholder="시간 (h)" value={newHours} onChange={e => setNewHours(e.target.value)} style={{ padding: '8px', width: '80px', border: '1px solid #ccc', borderRadius: '4px' }} />
+            <input type="number" placeholder="참가비 (원)" value={newPrice} onChange={e => setNewPrice(e.target.value)} style={{ padding: '8px', width: '120px', border: '1px solid #ccc', borderRadius: '4px' }} />
             <input type="text" placeholder="간단한 설명" value={newDesc} onChange={e => setNewDesc(e.target.value)} style={{ padding: '8px', flex: 2, border: '1px solid #ccc', borderRadius: '4px' }} />
             <button onClick={handleAddCourse} style={{ padding: '8px 24px', backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>명단에 추가</button>
           </div>
@@ -158,6 +166,8 @@ export default function CoursesPage() {
                 <th>상태</th>
                 <th>과정명</th>
                 <th>분류</th>
+                <th style={{ textAlign: 'center' }}>시간</th>
+                <th style={{ textAlign: 'right' }}>참가비</th>
                 <th>설명</th>
                 <th style={{ textAlign: 'center' }}>수료자</th>
                 <th>최근 발급일</th>
@@ -193,6 +203,22 @@ export default function CoursesPage() {
                         </select>
                       ) : (
                         <span className={c.category === '자격증' ? 'badge success' : 'badge'}>{c.category}</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {isEditing ? (
+                        <input type="number" value={editHours} onChange={e => setEditHours(Number(e.target.value))}
+                          style={{ padding: '4px', border: '1px solid #4A90E2', borderRadius: '4px', width: '60px', textAlign: 'center' }} />
+                      ) : (
+                        <span>{c.hours ? c.hours + 'h' : '-'}</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {isEditing ? (
+                        <input type="number" value={editPrice} onChange={e => setEditPrice(Number(e.target.value))}
+                          style={{ padding: '4px', border: '1px solid #4A90E2', borderRadius: '4px', width: '100px', textAlign: 'right' }} />
+                      ) : (
+                        <span style={{ color: c.price ? 'var(--text-main)' : '#ccc' }}>{c.price ? c.price.toLocaleString() + '원' : '-'}</span>
                       )}
                     </td>
                     <td>
@@ -240,7 +266,7 @@ export default function CoursesPage() {
                   </tr>
                 );
               })}
-              {courses.length === 0 && <tr><td colSpan="7">등록된 과정이 없습니다.</td></tr>}
+              {courses.length === 0 && <tr><td colSpan="9">등록된 과정이 없습니다.</td></tr>}
             </tbody>
           </table>
         )}
