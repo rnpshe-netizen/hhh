@@ -494,23 +494,24 @@ export default function MembersPage() {
   };
 
   // 회원 비활성화(숨김) — 삭제하지 않고 숨기기
-  const handleHideMember = async () => {
+  const handleHideMember = () => {
     setConfirmDialog({
-      title: '회원 숨기기', message: '이 회원을 숨김 처리하시겠습니까?\n수료 기록은 보존되며, 목록에서만 숨겨집니다.',
-      onConfirm: async () => { setConfirmDialog(null);
-      const { error } = await supabase.from('members').update({ is_active: false }).eq('id', selectedMember.id);
-      if (!error) {
-        logActivity({ action: 'hide', targetType: 'member', targetId: selectedMember.id, targetName: selectedMember.name, details: '회원 숨김 처리' });
-        closeMemberDetail();
-        fetchMembers();
-      } else {
-        if (error.message.includes('is_active')) {
-          toast.error("아직 데이터베이스에 숨김 기능(is_active 컬럼)이 세팅되지 않았습니다.");
+      title: '회원 숨기기',
+      message: '이 회원을 숨김 처리하시겠습니까?\n수료 기록은 보존되며, 목록에서만 숨겨집니다.',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        const { error } = await supabase.from('members').update({ is_active: false }).eq('id', selectedMember.id);
+        if (!error) {
+          logActivity({ action: 'hide', targetType: 'member', targetId: selectedMember.id, targetName: selectedMember.name, details: '회원 숨김 처리' });
+          closeMemberDetail();
+          fetchMembers();
         } else {
-          toast.error("숨김 처리 실패: " + error.message);
+          if (error.message.includes('is_active')) {
+            toast.error("아직 데이터베이스에 숨김 기능(is_active 컬럼)이 세팅되지 않았습니다.");
+          } else {
+            toast.error("숨김 처리 실패: " + error.message);
+          }
         }
-      }
-    }
       },
     });
   };
