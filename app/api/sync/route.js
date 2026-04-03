@@ -1,5 +1,4 @@
-// 구글 시트 → Supabase 회원 동기화 API
-// 구글 폼 응답 시트에서 새 신청 건을 읽어 members 테이블에 등록
+// 구글 시트 → pending_syncs 대기 테이블에 저장 (관리자 승인 후 반영)
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { createClient } from '@supabase/supabase-js';
@@ -9,7 +8,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// 구글 서비스 계정 인증
 function getGoogleAuth() {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}');
   return new google.auth.GoogleAuth({
@@ -18,7 +16,6 @@ function getGoogleAuth() {
   });
 }
 
-// 전화번호 정규화 (하이픈 추가)
 function formatPhone(phone) {
   if (!phone) return null;
   const digits = String(phone).replace(/[^0-9]/g, '');
@@ -31,27 +28,21 @@ export async function POST(request) {
   try {
     const sheetId = process.env.GOOGLE_SHEET_ID;
     const sheetTab = process.env.GOOGLE_SHEET_TAB || 'Form_Responses';
-    if (!sheetId) {
-      return NextResponse.json({ error: 'GOOGLE_SHEET_ID 환경변수가 설정되지 않았습니다.' }, { status: 500 });
-    }
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-      return NextResponse.json({ error: 'GOOGLE_SERVICE_ACCOUNT_KEY 환경변수가 설정되지 않았습니다.' }, { status: 500 });
-    }
+    if (!sheetId) return NextResponse.json({ error: 'GOOGLE_SHEET_ID 환경변수 미설정' }, { status: 500 });
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return NextResponse.json({ error: 'GOOGLE_SERVICE_ACCOUNT_KEY 환경변수 미설정' }, { status: 500 });
 
     const auth = getGoogleAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // 디버그: 먼저 스프레드시트 메타데이터로 시트 목록 확인
-    let sheetNames = [];
+    // 시트 탭 이름 자동 감지
+    let actualTab = sheetTab;
     try {
       const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-      sheetNames = meta.data.sheets.map(s => s.properties.title);
-    } catch (metaErr) {
-      return NextResponse.json({ error: '시트 접근 실패: ' + metaErr.message, sheetId, sheetTab }, { status: 500 });
+      const sheetNames = meta.data.sheets.map(s => s.properties.title);
+      actualTab = sheetNames.find(n => n === sheetTab) || sheetNames[0];
+    } catch (e) {
+      return NextResponse.json({ error: '시트 접근 실패: ' + e.message }, { status: 500 });
     }
-
-    // 실제 시트 탭 이름으로 자동 매칭 (정확한 이름 사용)
-    const actualTab = sheetNames.find(n => n === sheetTab) || sheetNames[0];
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
@@ -60,83 +51,118 @@ export async function POST(request) {
 
     const rows = response.data.values;
     if (!rows || rows.length <= 1) {
-      return NextResponse.json({ message: '동기화할 새 데이터가 없습니다.', synced: 0 });
+      return NextResponse.json({ message: '동기화할 새 데이터가 없습니다.', created: 0 });
     }
 
-    // 첫 행은 헤더, 나머지가 데이터
-    const header = rows[0];
     const dataRows = rows.slice(1);
-
-    let synced = 0;
+    let created = 0;
     let skipped = 0;
     let errors = [];
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
-      const rowNum = i + 2; // 시트 기준 행 번호
+      const rowNum = i + 2;
 
-      // N열 (동기화여부)이 TRUE면 이미 처리된 건 → 건너뜀
-      if (row[13] === 'TRUE') {
-        skipped++;
-        continue;
-      }
+      // N열이 TRUE면 이미 처리 완료
+      if (row[13] === 'TRUE') { skipped++; continue; }
 
-      const name = (row[1] || '').trim();        // B: 이름(한글)
-      const nameEn = (row[2] || '').trim();       // C: 이름(영문)
-      const birthDate = (row[3] || '').trim();    // D: 생년월일
-      const phone = formatPhone(row[4]);           // E: 연락처
-      const email = (row[5] || '').trim();         // F: 이메일
-      const address = (row[6] || '').trim();       // G: 주소
-      const courseName = (row[7] || '').trim();    // H: 신청과정
-      const isRetake = (row[9] || '').includes('재수강'); // J: 재수강여부
+      const name = (row[1] || '').trim();
+      const nameEn = (row[2] || '').trim();
+      const birthDate = (row[3] || '').trim();
+      const phone = formatPhone(row[4]);
+      const email = (row[5] || '').trim();
+      const address = (row[6] || '').trim();
+      const courseName = (row[7] || '').trim();
+      const isRetake = (row[9] || '').includes('재수강');
+      const extraCert = (row[10] || '').trim();
+      const currentCert = (row[11] || '').trim();
+      const note = (row[12] || '').trim();
 
-      if (!name) {
-        skipped++;
-        continue;
-      }
+      if (!name) { skipped++; continue; }
 
-      // 중복 체크 (이름 + 연락처 기준)
+      const formData = {
+        name, nameEn, birthDate, phone, email, address,
+        courseName, isRetake, extraCert, currentCert, note,
+        timestamp: row[0] || '',
+      };
+
+      // 이미 pending_syncs에 같은 행이 있으면 건너뜀
+      const { data: existingSync } = await supabase.from('pending_syncs')
+        .select('id').eq('sheet_row', rowNum).limit(1);
+      if (existingSync && existingSync.length > 0) { skipped++; continue; }
+
+      // 기존 회원 검색 (이름 + 전화번호)
       let existingMember = null;
       if (phone) {
         const { data } = await supabase.from('members')
-          .select('id, name')
-          .eq('name', name)
-          .eq('phone', phone)
-          .limit(1);
+          .select('id, name, phone, email, memo')
+          .eq('name', name).eq('phone', phone).limit(1);
         if (data && data.length > 0) existingMember = data[0];
       }
 
       if (existingMember) {
-        // 기존 회원 → 이메일/주소 업데이트만 (덮어쓰기)
-        const updates = {};
-        if (email && !existingMember.email) updates.email = email;
-        if (Object.keys(updates).length > 0) {
-          await supabase.from('members').update(updates).eq('id', existingMember.id);
-        }
-        skipped++;
-      } else {
-        // 신규 회원 등록
-        const { data, error } = await supabase.from('members').insert([{
-          name,
-          phone,
-          email: email || null,
-          memo: [
-            nameEn ? `영문: ${nameEn}` : '',
-            birthDate ? `생년월일: ${birthDate}` : '',
-            address ? `주소: ${address}` : '',
-            courseName ? `신청과정: ${courseName}` : '',
-            isRetake ? '재수강' : '',
-          ].filter(Boolean).join(' / '),
-        }]).select();
+        // 기존 회원 → 변경사항 비교
+        const changes = [];
 
-        if (error) {
-          errors.push({ row: rowNum, name, error: error.message });
-        } else {
-          synced++;
+        if (email && email !== existingMember.email) {
+          changes.push({ field: 'email', label: '이메일', old: existingMember.email || '없음', new: email, approved: null });
         }
+        if (address) {
+          const existingMemo = existingMember.memo || '';
+          const existingAddr = existingMemo.match(/주소: ([^/]+)/)?.[1]?.trim();
+          if (address !== existingAddr) {
+            changes.push({ field: 'address', label: '주소', old: existingAddr || '없음', new: address, approved: null });
+          }
+        }
+        if (nameEn) {
+          const existingMemo = existingMember.memo || '';
+          const existingNameEn = existingMemo.match(/영문: ([^/]+)/)?.[1]?.trim();
+          if (nameEn !== existingNameEn) {
+            changes.push({ field: 'nameEn', label: '영문이름', old: existingNameEn || '없음', new: nameEn, approved: null });
+          }
+        }
+        // 신청 과정은 항상 변경사항에 포함
+        if (courseName) {
+          changes.push({ field: 'course', label: '신청 과정', old: null, new: courseName, approved: null, isRetake });
+        }
+
+        const { error } = await supabase.from('pending_syncs').insert([{
+          sheet_row: rowNum,
+          member_id: existingMember.id,
+          sync_type: 'update',
+          form_data: formData,
+          changes,
+          status: 'pending',
+        }]);
+
+        if (error) { errors.push({ row: rowNum, name, error: error.message }); }
+        else { created++; }
+
+      } else {
+        // 신규 회원
+        // 이름만 같은 유사 회원 검색 (동명이인 가능성)
+        const { data: similarMembers } = await supabase.from('members')
+          .select('id, name, phone, email').eq('name', name).limit(5);
+
+        const changes = [];
+        if (courseName) {
+          changes.push({ field: 'course', label: '신청 과정', old: null, new: courseName, approved: null, isRetake });
+        }
+
+        const { error } = await supabase.from('pending_syncs').insert([{
+          sheet_row: rowNum,
+          member_id: null,
+          sync_type: similarMembers && similarMembers.length > 0 ? 'similar' : 'new',
+          form_data: formData,
+          changes,
+          status: 'pending',
+        }]);
+
+        if (error) { errors.push({ row: rowNum, name, error: error.message }); }
+        else { created++; }
       }
 
-      // 동기화 완료 표시 (N열에 TRUE 기록)
+      // 시트에 처리 완료 표시
       try {
         await sheets.spreadsheets.values.update({
           spreadsheetId: sheetId,
@@ -144,19 +170,10 @@ export async function POST(request) {
           valueInputOption: 'RAW',
           requestBody: { values: [['TRUE']] },
         });
-      } catch (e) {
-        // 시트 쓰기 실패해도 DB 등록은 유지
-      }
+      } catch (e) {}
     }
 
-    return NextResponse.json({
-      success: true,
-      synced,
-      skipped,
-      errors: errors.length > 0 ? errors : undefined,
-      total: dataRows.length,
-    });
-
+    return NextResponse.json({ success: true, created, skipped, errors: errors.length > 0 ? errors : undefined, total: dataRows.length });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
