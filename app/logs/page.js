@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import Pagination from '../components/Pagination';
 
 const PAGE_SIZE = 50;
 
@@ -113,7 +116,7 @@ export default function LogsPage() {
             ⚠️ {error}
           </div>
         ) : loading ? (
-          <p>로그를 불러오는 중입니다...</p>
+          <LoadingSpinner message="로그를 불러오는 중입니다..." />
         ) : (
           <table>
             <thead>
@@ -148,29 +151,13 @@ export default function LogsPage() {
                   </tr>
                 );
               })}
-              {logs.length === 0 && <tr><td colSpan="6" style={{textAlign: 'center', padding: '24px'}}>기록된 활동이 없습니다.</td></tr>}
+              {logs.length === 0 && <tr><td colSpan="6"><EmptyState icon="📋" title="기록된 활동이 없습니다" /></td></tr>}
             </tbody>
           </table>
         )}
 
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
-            <button onClick={() => setPage(1)} disabled={page === 1} style={pgBtnStyle(page === 1)}>«</button>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={pgBtnStyle(page === 1)}>‹</button>
-            <span style={{ padding: '6px 12px', fontSize: '14px' }}>{page} / {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={pgBtnStyle(page === totalPages)}>›</button>
-            <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={pgBtnStyle(page === totalPages)}>»</button>
-          </div>
-        )}
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </div>
     </div>
   );
-}
-
-function pgBtnStyle(disabled) {
-  return {
-    padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: '4px',
-    backgroundColor: disabled ? '#f9fafb' : '#fff', color: disabled ? '#d1d5db' : '#374151',
-    cursor: disabled ? 'default' : 'pointer', fontSize: '14px',
-  };
 }

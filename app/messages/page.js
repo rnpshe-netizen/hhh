@@ -2,8 +2,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { logActivity } from '../../lib/activityLog';
+import { useToast } from '../components/Toast';
 
 export default function MessagesPage() {
+  const toast = useToast();
   const [step, setStep] = useState(1); // 1: 채널선택, 2: 수신자, 3: 내용작성, 4: 확인/발송
   const [courses, setCourses] = useState([]);
 
@@ -77,8 +79,8 @@ export default function MessagesPage() {
 
   // 발송 실행
   const handleSend = async () => {
-    if (!channel || !body.trim()) return alert("채널과 내용을 입력해주세요.");
-    if (sendableCount === 0) return alert("발송 가능한 수신자가 없습니다.");
+    if (!channel || !body.trim()) return toast.warning("채널과 내용을 입력해주세요.");
+    if (sendableCount === 0) return toast.warning("발송 가능한 수신자가 없습니다.");
 
     if (!window.confirm(`${channelLabel(channel)}로 ${sendableCount}명에게 발송하시겠습니까?`)) return;
 
@@ -102,7 +104,7 @@ export default function MessagesPage() {
     }]).select().single();
 
     if (campError) {
-      alert("캠페인 생성 실패: " + campError.message);
+      toast.error("캠페인 생성 실패: " + campError.message);
       setSending(false);
       return;
     }
@@ -183,7 +185,7 @@ export default function MessagesPage() {
     }]).select();
     if (!error && data) {
       setTemplates([data[0], ...templates]);
-      alert("템플릿이 저장되었습니다.");
+      toast.success("템플릿이 저장되었습니다.");
     }
   };
 
@@ -363,7 +365,7 @@ export default function MessagesPage() {
               )}
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between' }}>
                 <button onClick={() => setStep(1)} style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}>← 이전</button>
-                <button onClick={() => { if (sendableCount === 0) { alert("먼저 수신자를 조회하세요."); return; } setStep(3); }}
+                <button onClick={() => { if (sendableCount === 0) { toast.warning("먼저 수신자를 조회하세요."); return; } setStep(3); }}
                   style={{ padding: '8px 16px', backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                   다음 →
                 </button>
@@ -414,7 +416,7 @@ export default function MessagesPage() {
               </p>
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', marginTop: '16px' }}>
                 <button onClick={() => setStep(2)} style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}>← 이전</button>
-                <button onClick={() => { if (!body.trim()) { alert("내용을 입력하세요."); return; } setStep(4); }}
+                <button onClick={() => { if (!body.trim()) { toast.warning("내용을 입력하세요."); return; } setStep(4); }}
                   style={{ padding: '8px 16px', backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                   다음 →
                 </button>

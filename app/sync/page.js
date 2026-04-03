@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { useToast } from '../components/Toast';
 
 export default function SyncPage() {
+  const toast = useToast();
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const [pendingItems, setPendingItems] = useState([]);
@@ -70,10 +72,10 @@ export default function SyncPage() {
       if (data.success) {
         fetchPending();
       } else {
-        alert('처리 실패: ' + (data.error || '알 수 없는 오류'));
+        toast.error('처리 실패: ' + (data.error || '알 수 없는 오류'));
       }
     } catch (err) {
-      alert('API 오류: ' + err.message);
+      toast.error('API 오류: ' + err.message);
     }
     setProcessing(null);
   };
@@ -90,7 +92,7 @@ export default function SyncPage() {
       });
       fetchPending();
     } catch (err) {
-      alert('오류: ' + err.message);
+      toast.error('오류: ' + err.message);
     }
     setProcessing(null);
   };
