@@ -21,6 +21,9 @@ export default function MembersPage() {
   const [rankFilter, setRankFilter] = useState('all'); // all | 1 | 2 | 3 | none
   const [courseFilter, setCourseFilter] = useState(new Map()); // 빈 Map = 전체, Map<courseId, cohort문자열>
   const [courseDropOpen, setCourseDropOpen] = useState(false);
+  const [courseCohorts, setCourseCohorts] = useState({}); // { courseId: ['1기', '2기', ...] }
+  const [cohortSearches, setCohortSearches] = useState({}); // { courseId: '검색어' }
+  const [cohortDropOpenId, setCohortDropOpenId] = useState(null); // 현재 열린 기수 드롭다운 과정 ID
   const courseDropRef = useRef(null);
 
   // 체크박스 선택 상태
@@ -68,6 +71,25 @@ export default function MembersPage() {
 
   useEffect(() => {
     supabase.from('courses').select('*').order('created_at').then(({ data }) => setCourses(data || []));
+    // 과정별 기수 목록 조회 (검색 드롭다운용)
+    supabase.from('completions').select('course_id, cohort').not('cohort', 'is', null).then(({ data }) => {
+      const map = {};
+      (data || []).forEach(row => {
+        if (!row.cohort) return;
+        if (!map[row.course_id]) map[row.course_id] = new Set();
+        map[row.course_id].add(row.cohort);
+      });
+      const result = {};
+      for (const [courseId, cohortSet] of Object.entries(map)) {
+        // 기수를 숫자 기준으로 정렬 (1기, 2기, ... 10기, 11기)
+        result[courseId] = [...cohortSet].sort((a, b) => {
+          const numA = parseInt(a) || 0;
+          const numB = parseInt(b) || 0;
+          return numA - numB;
+        });
+      }
+      setCourseCohorts(result);
+    });
     // matching_report.json에서 순위 맵 구성
     fetch('/matching_report.json')
       .then(r => r.json())
@@ -568,16 +590,47 @@ export default function MembersPage() {
                       📜 {c.name}
                     </label>
                     {isChecked && (
-                      <input type="text" placeholder="기수 (예: 10기)" value={courseFilter.get(c.id) || ''}
-                        onChange={(e) => {
-                          setCourseFilter(prev => {
-                            const next = new Map(prev);
-                            next.set(c.id, e.target.value);
-                            return next;
-                          });
-                        }}
-                        onClick={e => e.stopPropagation()}
-                        style={{ marginLeft: '24px', marginTop: '4px', padding: '3px 8px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px', width: '100px' }} />
+                      <div style={{ marginLeft: '24px', marginTop: '4px', position: 'relative' }}>
+                        <div onClick={e => { e.stopPropagation(); setCohortDropOpenId(cohortDropOpenId === c.id ? null : c.id); }}
+                          style={{ padding: '3px 8px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px', width: '120px', cursor: 'pointer', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: courseFilter.get(c.id) ? '#333' : '#9ca3af' }}>{courseFilter.get(c.id) || '전체'}</span>
+                          <span style={{ fontSize: '10px', color: '#9ca3af' }}>▾</span>
+                        </div>
+                        {cohortDropOpenId === c.id && (
+                          <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, backgroundColor: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', marginTop: '2px', width: '140px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)', maxHeight: '180px', overflow: 'auto' }}>
+                            <input type="text" placeholder="🔍 기수 검색" value={cohortSearches[c.id] || ''}
+                              onChange={e => setCohortSearches(prev => ({ ...prev, [c.id]: e.target.value }))}
+                              style={{ padding: '4px 8px', fontSize: '11px', border: 'none', borderBottom: '1px solid #e5e7eb', width: '100%', boxSizing: 'border-box', outline: 'none' }} />
+                            <div onClick={() => {
+                              setCourseFilter(prev => { const next = new Map(prev); next.set(c.id, ''); return next; });
+                              setCohortDropOpenId(null); setCohortSearches(prev => ({ ...prev, [c.id]: '' }));
+                            }} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', color: '#6b7280', fontWeight: 'bold' }}
+                              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                              전체
+                            </div>
+                            {(courseCohorts[c.id] || [])
+                              .filter(cohort => !cohortSearches[c.id] || cohort.includes(cohortSearches[c.id]))
+                              .map(cohort => (
+                                <div key={cohort} onClick={() => {
+                                  setCourseFilter(prev => { const next = new Map(prev); next.set(c.id, cohort); return next; });
+                                  setCohortDropOpenId(null); setCohortSearches(prev => ({ ...prev, [c.id]: '' }));
+                                }} style={{
+                                  padding: '4px 8px', fontSize: '12px', cursor: 'pointer',
+                                  backgroundColor: courseFilter.get(c.id) === cohort ? '#e0f2fe' : 'transparent',
+                                  fontWeight: courseFilter.get(c.id) === cohort ? 'bold' : 'normal',
+                                }}
+                                  onMouseEnter={e => { if (courseFilter.get(c.id) !== cohort) e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
+                                  onMouseLeave={e => { if (courseFilter.get(c.id) !== cohort) e.currentTarget.style.backgroundColor = 'transparent'; }}>
+                                  {cohort}
+                                </div>
+                              ))}
+                            {(courseCohorts[c.id] || []).filter(cohort => !cohortSearches[c.id] || cohort.includes(cohortSearches[c.id])).length === 0 && (
+                              <div style={{ padding: '8px', fontSize: '11px', color: '#9ca3af', textAlign: 'center' }}>기수 없음</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
