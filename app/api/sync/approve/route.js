@@ -33,17 +33,13 @@ export async function POST(request) {
 
     if (sync.sync_type === 'new' || sync.sync_type === 'similar') {
       // 신규 회원 등록
-      const memoparts = [
-        formData.nameEn ? `영문: ${formData.nameEn}` : '',
-        formData.birthDate ? `생년월일: ${formData.birthDate}` : '',
-        formData.address ? `주소: ${formData.address}` : '',
-      ].filter(Boolean).join(' / ');
-
       const { data: newMember, error: insertErr } = await supabase.from('members').insert([{
         name: formData.name,
         phone: formData.phone,
         email: formData.email || null,
-        memo: memoparts || null,
+        name_en: formData.nameEn || null,
+        birth_date: formData.birthDate || null,
+        address: formData.address || null,
       }]).select().single();
 
       if (insertErr) return NextResponse.json({ error: '회원 등록 실패: ' + insertErr.message }, { status: 500 });
