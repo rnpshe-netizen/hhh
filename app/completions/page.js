@@ -2,6 +2,10 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
+import { useToast } from '../components/Toast';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import Pagination from '../components/Pagination';
 
 const PAGE_SIZE = 50;
 
@@ -15,6 +19,7 @@ export default function CompletionsPage() {
 }
 
 function CompletionsContent() {
+  const toast = useToast();
   const searchParams = useSearchParams();
   const [completions, setCompletions] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -86,14 +91,6 @@ function CompletionsContent() {
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(page * PAGE_SIZE, totalCount);
 
-  const getPageNumbers = () => {
-    const pages = [];
-    let start = Math.max(1, page - 3);
-    let end = Math.min(totalPages, start + 6);
-    if (end - start < 6) start = Math.max(1, end - 6);
-    for (let i = start; i <= end; i++) pages.push(i);
-    return pages;
-  };
 
   // CSV 내보내기
   const handleExportCSV = async () => {
@@ -129,7 +126,7 @@ function CompletionsContent() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    alert(`총 ${all.length}건의 수료 기록을 CSV로 추출했습니다.`);
+    toast.success(`총 ${all.length}건의 수료 기록을 CSV로 추출했습니다.`);
   };
 
   return (
@@ -167,7 +164,7 @@ function CompletionsContent() {
 
       {/* 테이블 */}
       <div className="card">
-        {loading ? <p>수료 기록을 불러오는 중입니다...</p> : (
+        {loading ? <LoadingSpinner message="수료 기록을 불러오는 중입니다..." /> : (
           <table>
             <thead>
               <tr>
@@ -202,37 +199,13 @@ function CompletionsContent() {
                   </td>
                 </tr>
               ))}
-              {completions.length === 0 && <tr><td colSpan="6" style={{textAlign: 'center', padding: '24px'}}>검색 결과가 없습니다.</td></tr>}
+              {completions.length === 0 && <tr><td colSpan="6"><EmptyState icon="🔍" title="검색 결과가 없습니다" description="다른 필터를 시도해보세요" /></td></tr>}
             </tbody>
           </table>
         )}
 
-        {/* 페이지네이션 */}
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
-            <button onClick={() => setPage(1)} disabled={page === 1} style={pgBtnStyle(page === 1)}>«</button>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={pgBtnStyle(page === 1)}>‹</button>
-            {getPageNumbers().map(p => (
-              <button key={p} onClick={() => setPage(p)} style={{
-                ...pgBtnStyle(false),
-                backgroundColor: p === page ? 'var(--primary)' : '#fff',
-                color: p === page ? '#fff' : '#374151',
-                fontWeight: p === page ? 'bold' : 'normal',
-              }}>{p}</button>
-            ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={pgBtnStyle(page === totalPages)}>›</button>
-            <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={pgBtnStyle(page === totalPages)}>»</button>
-          </div>
-        )}
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </div>
     </div>
   );
-}
-
-function pgBtnStyle(disabled) {
-  return {
-    padding: '6px 12px', border: '1px solid #d1d5db', borderRadius: '4px',
-    backgroundColor: disabled ? '#f9fafb' : '#fff', color: disabled ? '#d1d5db' : '#374151',
-    cursor: disabled ? 'default' : 'pointer', fontSize: '14px', minWidth: '36px', textAlign: 'center',
-  };
 }

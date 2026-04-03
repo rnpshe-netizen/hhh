@@ -4,9 +4,12 @@ import { supabase } from '../../lib/supabaseClient';
 import { logActivity } from '../../lib/activityLog';
 import { useToast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function CoursesPage() {
   const toast = useToast();
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [courses, setCourses] = useState([]);
   const [courseStats, setCourseStats] = useState({}); // { course_id: { count, lastIssued } }
   const [loading, setLoading] = useState(true);
@@ -77,15 +80,19 @@ export default function CoursesPage() {
     const newState = course.is_active === false ? true : false;
     const actionTxt = newState ? '다시 운영(숨김 해제)' : '운영 종료(숨김 처리)';
 
-    if (window.confirm(`이 과정을 [${actionTxt}] 상태로 변경하시겠습니까?\n숨김 처리해도 기존 수료 내역은 삭제되지 않습니다.`)) {
-      const { error } = await supabase.from('courses').update({ is_active: newState }).eq('id', course.id);
-      if (error) {
-        toast.error("업데이트 실패: " + error.message);
-      } else {
-        logActivity({ action: 'hide', targetType: 'course', targetId: course.id, targetName: course.name, details: actionTxt });
-        setCourses(courses.map(c => c.id === course.id ? { ...c, is_active: newState } : c));
-      }
-    }
+    setConfirmDialog({
+      title: actionTxt, message: `이 과정을 [${actionTxt}] 상태로 변경하시겠습니까?\n숨김 처리해도 기존 수료 내역은 삭제되지 않습니다.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        const { error } = await supabase.from('courses').update({ is_active: newState }).eq('id', course.id);
+        if (error) {
+          toast.error("업데이트 실패: " + error.message);
+        } else {
+          logActivity({ action: 'hide', targetType: 'course', targetId: course.id, targetName: course.name, details: actionTxt });
+          setCourses(courses.map(c => c.id === course.id ? { ...c, is_active: newState } : c));
+        }
+      },
+    });
   };
 
   // 과정 영구 삭제 (연쇄 삭제 경고)
@@ -95,15 +102,19 @@ export default function CoursesPage() {
       ? `🚨 [연쇄 삭제 경고]\n"${course.name}" 과정을 영구 삭제하시겠습니까?\n\n이 과정에 연결된 수료 기록 ${stat.count}건도 함께 삭제됩니다!\n\n💡 삭제 대신 [숨김]을 사용하면 기록을 보존할 수 있습니다.`
       : `"${course.name}" 과정을 영구 삭제하시겠습니까?`;
 
-    if (window.confirm(msg)) {
-      const { error } = await supabase.from('courses').delete().eq('id', course.id);
-      if (!error) {
-        logActivity({ action: 'delete', targetType: 'course', targetId: course.id, targetName: course.name, details: `과정 영구 삭제 (수료 ${stat.count}건 연쇄 삭제)` });
-        setCourses(courses.filter(c => c.id !== course.id));
-      } else {
-        toast.error("삭제 실패: " + error.message);
-      }
-    }
+    setConfirmDialog({
+      title: '과정 영구 삭제', message: msg, danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        const { error } = await supabase.from('courses').delete().eq('id', course.id);
+        if (!error) {
+          logActivity({ action: 'delete', targetType: 'course', targetId: course.id, targetName: course.name, details: `과정 영구 삭제 (수료 ${stat.count}건 연쇄 삭제)` });
+          setCourses(courses.filter(c => c.id !== course.id));
+        } else {
+          toast.error("삭제 실패: " + error.message);
+        }
+      },
+    });
   };
 
   // 과정 수정 시작
@@ -269,7 +280,7 @@ export default function CoursesPage() {
                   </tr>
                 );
               })}
-              {courses.length === 0 && <tr><td colSpan="9">등록된 과정이 없습니다.</td></tr>}
+              {courses.length === 0 && <tr><td colSpan="9"><EmptyState icon="📚" title="등록된 과정이 없습니다" /></td></tr>}
             </tbody>
           </table>
         )}
@@ -277,6 +288,10 @@ export default function CoursesPage() {
           * [숨김]을 눌러도 기존 수료 내역은 날아가지 않습니다. 단순히 새로운 회원에게 수동 발급할 때 선택지에서 사라집니다.
         </p>
       </div>
+      {confirmDialog && (
+        <ConfirmDialog title={confirmDialog.title} message={confirmDialog.message} danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog(null)} />
+      )}
     </div>
   );
 }
