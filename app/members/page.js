@@ -720,9 +720,9 @@ export default function MembersPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '14px' }}>
                     <div><span style={{ color: '#6b7280' }}>연락처:</span> <strong>{selectedMember.phone || '없음'}</strong></div>
                     <div><span style={{ color: '#6b7280' }}>이메일:</span> <strong style={{ color: selectedMember.email ? '#333' : '#ccc' }}>{selectedMember.email || '없음'}</strong></div>
-                    {selectedMember.name_en && <div><span style={{ color: '#6b7280' }}>영문이름:</span> <strong>{selectedMember.name_en}</strong></div>}
-                    {selectedMember.birth_date && <div><span style={{ color: '#6b7280' }}>생년월일:</span> <strong>{selectedMember.birth_date}</strong></div>}
-                    {selectedMember.address && <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#6b7280' }}>주소:</span> <strong>{selectedMember.address}</strong></div>}
+                    <div><span style={{ color: '#6b7280' }}>영문이름:</span> <strong style={{ color: selectedMember.name_en ? '#333' : '#ccc' }}>{selectedMember.name_en || '-'}</strong></div>
+                    <div><span style={{ color: '#6b7280' }}>생년월일:</span> <strong style={{ color: selectedMember.birth_date ? '#333' : '#ccc' }}>{selectedMember.birth_date || '-'}</strong></div>
+                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#6b7280' }}>주소:</span> <strong style={{ color: selectedMember.address ? '#333' : '#ccc' }}>{selectedMember.address || '-'}</strong></div>
                   </div>
                   {selectedMember.memo && (
                     <div style={{ marginTop: '10px', padding: '8px 12px', backgroundColor: '#f0f9ff', borderRadius: '4px', border: '1px solid #bae6fd' }}>
