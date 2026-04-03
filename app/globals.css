@@ -142,3 +142,32 @@ th {
 td {
   font-size: 15px;
 }
+
+/* 테이블 행 호버 효과 (전 페이지 통일) */
+tbody tr {
+  transition: background-color 0.15s ease;
+}
+tbody tr:hover td {
+  background-color: #F1F8FF;
+}
+
+/* 카드 호버 효과 (KPI 카드 등) */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* 토스트 애니메이션 */
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* 로딩 스피너 */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

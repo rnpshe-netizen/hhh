@@ -2,6 +2,7 @@ import './globals.css';
 import Link from 'next/link';
 import Topbar from './components/Topbar';
 import SidebarNav from './components/SidebarNav';
+import ClientProviders from './components/ClientProviders';
 
 export const metadata = {
   title: "ICTI-MIS | 국제코칭훈련원 통합업무시스템",
@@ -24,12 +25,14 @@ export default function RootLayout({ children }) {
           </div>
         </div>
         
-        <div className="main-wrapper">
-          <Topbar />
-          <main className="content">
-            {children}
-          </main>
-        </div>
+        <ClientProviders>
+          <div className="main-wrapper">
+            <Topbar />
+            <main className="content">
+              {children}
+            </main>
+          </div>
+        </ClientProviders>
       </body>
     </html>
   );

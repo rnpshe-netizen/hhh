@@ -80,35 +80,35 @@ export default async function Dashboard() {
       
       {/* 5 Summary Cards — 상단 3개 + 하단 2개 */}
       <div style={{ display: 'flex', gap: '24px' }}>
-        <Link href="/members" className="card" style={{ flex: 1, borderLeft: '4px solid var(--primary)', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
+        <Link href="/members" className="card card-hover" style={{ flex: 1, borderLeft: '4px solid var(--primary)', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>총 활성 회원</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>{memberCount?.toLocaleString() || 0} <span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}>명</span></p>
         </Link>
-        <Link href="/courses" className="card" style={{ flex: 1, borderLeft: '4px solid #FFBB28', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
+        <Link href="/courses" className="card card-hover" style={{ flex: 1, borderLeft: '4px solid #FFBB28', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>운영 코칭 과정</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>{courseCount?.toLocaleString() || 0} <span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}>분야</span></p>
         </Link>
-        <Link href="/completions" className="card" style={{ flex: 1, borderLeft: '4px solid var(--success)', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
+        <Link href="/completions" className="card card-hover" style={{ flex: 1, borderLeft: '4px solid var(--success)', display: 'flex', flexDirection: 'column', justifyContent: 'center', textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>총 누적 발급</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px' }}>{compCount?.toLocaleString() || 0} <span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}>건</span></p>
         </Link>
       </div>
       <div style={{ display: 'flex', gap: '24px' }}>
-        <div className="card" style={{ flex: 1, borderLeft: '4px solid #8B5CF6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="card card-hover" style={{ flex: 1, borderLeft: '4px solid #8B5CF6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>연락처 확보율</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px', color: '#8B5CF6' }}>
             {memberCount > 0 ? Math.round((hasPhoneCount / memberCount) * 100) : 0}<span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}>%</span>
           </p>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{hasPhoneCount?.toLocaleString() || 0}명 / {memberCount?.toLocaleString() || 0}명</p>
         </div>
-        <div className="card" style={{ flex: 1, borderLeft: '4px solid #F97316', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="card card-hover" style={{ flex: 1, borderLeft: '4px solid #F97316', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>이번 달 신규 수료</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px', color: '#F97316' }}>
             {thisMonthCount?.toLocaleString() || 0}<span style={{fontSize:'16px', fontWeight: 'normal', color: 'gray'}}> 건</span>
           </p>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>{now.getFullYear()}년 {now.getMonth() + 1}월 기준</p>
         </div>
-        <div className="card" style={{ flex: 1, borderLeft: '4px solid #06B6D4', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="card card-hover" style={{ flex: 1, borderLeft: '4px solid #06B6D4', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <h3 style={{ color: 'var(--text-muted)' }}>전년 대비 증감</h3>
           <p style={{ fontSize: '32px', fontWeight: 'bold', marginTop: '8px', color: yoyChange > 0 ? '#16a34a' : yoyChange < 0 ? '#dc2626' : '#6b7280' }}>
             {yoyChange !== null ? (yoyChange > 0 ? '+' : '') + yoyChange + '%' : '-'}
