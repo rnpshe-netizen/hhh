@@ -1,8 +1,10 @@
 "use client";
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 
 export default function RecentCompletions({ initial }) {
+  const router = useRouter();
   const [items, setItems] = useState(initial);
   const [limit, setLimit] = useState(10);
   const [loading, setLoading] = useState(false);
@@ -38,7 +40,8 @@ export default function RecentCompletions({ initial }) {
         <tbody>
           {items.map((r) => (
             <tr key={r.id}>
-              <td style={{ fontWeight: 500 }}>{r.members?.name}</td>
+              <td style={{ fontWeight: 500, color: 'var(--primary)', cursor: 'pointer' }}
+                onClick={() => router.push(`/members?search=${encodeURIComponent(r.members?.name || '')}`)}>{r.members?.name}</td>
               <td>
                 <span className="badge">{r.courses?.name}</span>
                 {r.note && <span className="badge" style={{marginLeft: '8px', backgroundColor: '#ffedd5', color: '#c2410c'}}>📌 {r.note}</span>}

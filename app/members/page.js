@@ -5,6 +5,7 @@ import { logActivity } from '../../lib/activityLog';
 import { useToast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const PAGE_SIZE = 50;
 
@@ -27,7 +28,8 @@ export default function MembersPage() {
   const [courseDropOpen, setCourseDropOpen] = useState(false);
   const [courseCohorts, setCourseCohorts] = useState({}); // { courseId: ['1기', '2기', ...] }
   const [cohortSearches, setCohortSearches] = useState({}); // { courseId: '검색어' }
-  const [cohortDropOpenId, setCohortDropOpenId] = useState(null); // 현재 열린 기수 드롭다운 과정 ID
+  const [cohortDropOpenId, setCohortDropOpenId] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null); // { title, message, onConfirm, danger }
   const courseDropRef = useRef(null);
 
   // 체크박스 선택 상태
@@ -314,9 +316,14 @@ export default function MembersPage() {
   };
 
   // 일괄 삭제
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`🚨 선택된 ${selectedIds.size}명의 회원을 정말 영구 삭제하시겠습니까?\n관련된 모든 수료 기록도 함께 삭제됩니다!`)) return;
+    setConfirmDialog({
+      title: '일괄 삭제',
+      message: `선택된 ${selectedIds.size}명의 회원을 정말 영구 삭제하시겠습니까?\n관련된 모든 수료 기록도 함께 삭제됩니다!`,
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
 
     const ids = [...selectedIds];
     const deletedNames = members.filter(m => ids.includes(m.id)).map(m => m.name);
@@ -328,6 +335,8 @@ export default function MembersPage() {
     } else {
       toast.error("삭제 실패: " + error.message);
     }
+      },
+    });
   };
 
   // CSV 전체 추출 (현재 필터/검색 조건에 해당하는 전체 회원)
@@ -482,7 +491,9 @@ export default function MembersPage() {
 
   // 회원 비활성화(숨김) — 삭제하지 않고 숨기기
   const handleHideMember = async () => {
-    if (window.confirm("이 회원을 숨김 처리하시겠습니까?\n수료 기록은 보존되며, 목록에서만 숨겨집니다.")) {
+    setConfirmDialog({
+      title: '회원 숨기기', message: '이 회원을 숨김 처리하시겠습니까?\n수료 기록은 보존되며, 목록에서만 숨겨집니다.',
+      onConfirm: async () => { setConfirmDialog(null);
       const { error } = await supabase.from('members').update({ is_active: false }).eq('id', selectedMember.id);
       if (!error) {
         logActivity({ action: 'hide', targetType: 'member', targetId: selectedMember.id, targetName: selectedMember.name, details: '회원 숨김 처리' });
@@ -496,10 +507,15 @@ export default function MembersPage() {
         }
       }
     }
+      },
+    });
   };
 
-  const handleDeleteMember = async () => {
-    if (window.confirm("🚨 [연쇄 삭제 경고]\n이 회원을 정말 영구 삭제하시겠습니까?\n이 회원이 이수한 모든 수료 및 자격증 기록도 함께 우주 끝으로 날아갑니다!!\n\n💡 영구 삭제 대신 [숨기기]를 사용하면 기록을 보존할 수 있습니다.")) {
+  const handleDeleteMember = () => {
+    setConfirmDialog({
+      title: '회원 영구 삭제', danger: true,
+      message: '이 회원을 정말 영구 삭제하시겠습니까?\n이 회원이 이수한 모든 수료 및 자격증 기록도 함께 삭제됩니다.\n\n숨기기를 사용하면 기록을 보존할 수 있습니다.',
+      onConfirm: async () => { setConfirmDialog(null);
       const memberName = selectedMember.name;
       const memberId = selectedMember.id;
       const { error } = await supabase.from('members').delete().eq('id', memberId);
@@ -510,7 +526,8 @@ export default function MembersPage() {
       } else {
         toast.error("삭제 실패: " + error.message);
       }
-    }
+      },
+    });
   };
 
   const handleIssueCourse = async () => {
@@ -527,13 +544,17 @@ export default function MembersPage() {
     }
   };
 
-  const handleDeleteCompletion = async (compId) => {
-    if (window.confirm("이 수료 기록만 취소(삭제) 하시겠습니까?")) {
-      const comp = memberCompletions.find(c => c.id === compId);
-      await supabase.from('completions').delete().eq('id', compId);
-      logActivity({ action: 'delete', targetType: 'completion', targetId: compId, targetName: selectedMember.name, details: `${comp?.courses?.name || '과정'} 수료 취소` });
-      setMemberCompletions(memberCompletions.filter(c => c.id !== compId));
-    }
+  const handleDeleteCompletion = (compId) => {
+    const comp = memberCompletions.find(c => c.id === compId);
+    setConfirmDialog({
+      title: '수료 기록 취소', message: `${comp?.courses?.name || '과정'} 수료 기록을 삭제하시겠습니까?`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await supabase.from('completions').delete().eq('id', compId);
+        logActivity({ action: 'delete', targetType: 'completion', targetId: compId, targetName: selectedMember.name, details: `${comp?.courses?.name || '과정'} 수료 취소` });
+        setMemberCompletions(memberCompletions.filter(c => c.id !== compId));
+      },
+    });
   };
 
   // 페이지네이션 계산
@@ -744,8 +765,8 @@ export default function MembersPage() {
 
       {/* 회원 상세 & 수료증 수동 발급 관리 모달 */}
       {selectedMember && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ backgroundColor: '#fff', padding: '32px', borderRadius: '8px', width: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div onClick={closeMemberDetail} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: '#fff', padding: '32px', borderRadius: '8px', width: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #eee', paddingBottom: '16px', marginBottom: '24px' }}>
               <div>
@@ -950,6 +971,16 @@ export default function MembersPage() {
 
           </div>
         </div>
+      )}
+      {/* 확인 다이얼로그 */}
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );
