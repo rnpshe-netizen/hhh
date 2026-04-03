@@ -19,7 +19,7 @@ export default function MembersPage() {
   // 필터 상태
   const [contactFilter, setContactFilter] = useState('all'); // all | has | none
   const [rankFilter, setRankFilter] = useState('all'); // all | 1 | 2 | 3 | none
-  const [courseFilter, setCourseFilter] = useState(new Set()); // 빈 Set = 전체, Set에 course_id가 있으면 해당 과정만
+  const [courseFilter, setCourseFilter] = useState(new Map()); // 빈 Map = 전체, Map<courseId, cohort문자열>
   const [courseDropOpen, setCourseDropOpen] = useState(false);
   const courseDropRef = useRef(null);
 
@@ -122,14 +122,21 @@ export default function MembersPage() {
       query = query.or('phone.is.null,phone.eq.');
     }
 
-    // 수료 과정 필터 — completions 관계를 inner join하여 해당 과정 수료자만 조회
+    // 수료 과정+기수 필터 — completions inner join
     if (courseFilter.size > 0) {
-      const courseIds = [...courseFilter];
-      // completions 테이블과 inner join (completions!inner)
-      // 해당 course_id에 해당하는 수료 기록이 있는 회원만 반환
+      const courseIds = [...courseFilter.keys()];
+      const cohortFilters = [...courseFilter.entries()].filter(([_, cohort]) => cohort.trim());
+
       query = supabase.from('members')
-        .select('*, completions!inner(course_id)', { count: 'exact' })
+        .select('*, completions!inner(course_id, cohort)', { count: 'exact' })
         .in('completions.course_id', courseIds);
+
+      // 기수 필터가 있는 과정은 cohort도 매칭
+      if (cohortFilters.length > 0) {
+        // 기수가 입력된 과정들에 대해 OR 조건으로 cohort 필터
+        const cohortConditions = cohortFilters.map(([_, cohort]) => `completions.cohort.ilike.%${cohort.trim()}%`).join(',');
+        query = query.or(cohortConditions);
+      }
 
       // 기존 필터 재적용 (검색, 연락처)
       if (search.trim()) {
@@ -293,7 +300,7 @@ export default function MembersPage() {
         query = query.or('phone.is.null,phone.eq.');
       }
       if (courseFilter.size > 0) {
-        const courseIds = [...courseFilter];
+        const courseIds = [...courseFilter.keys()];
         query = supabase.from('members')
           .select('*, completions!inner(course_id)')
           .in('completions.course_id', courseIds);
@@ -546,27 +553,44 @@ export default function MembersPage() {
           </button>
           {courseDropOpen && (
             <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', marginTop: '4px', padding: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', minWidth: '220px' }}>
-              {courses.map(c => (
-                <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', cursor: 'pointer', fontSize: '13px' }}>
-                  <input type="checkbox" checked={courseFilter.has(c.id)} onChange={() => {
-                    setCourseFilter(prev => {
-                      const next = new Set(prev);
-                      if (next.has(c.id)) next.delete(c.id); else next.add(c.id);
-                      return next;
-                    });
-                  }} />
-                  📜 {c.name}
-                </label>
-              ))}
+              {courses.map(c => {
+                const isChecked = courseFilter.has(c.id);
+                return (
+                  <div key={c.id} style={{ padding: '4px 0' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input type="checkbox" checked={isChecked} onChange={() => {
+                        setCourseFilter(prev => {
+                          const next = new Map(prev);
+                          if (next.has(c.id)) next.delete(c.id); else next.set(c.id, '');
+                          return next;
+                        });
+                      }} />
+                      📜 {c.name}
+                    </label>
+                    {isChecked && (
+                      <input type="text" placeholder="기수 (예: 10기)" value={courseFilter.get(c.id) || ''}
+                        onChange={(e) => {
+                          setCourseFilter(prev => {
+                            const next = new Map(prev);
+                            next.set(c.id, e.target.value);
+                            return next;
+                          });
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        style={{ marginLeft: '24px', marginTop: '4px', padding: '3px 8px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px', width: '100px' }} />
+                    )}
+                  </div>
+                );
+              })}
               <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '6px', paddingTop: '6px', display: 'flex', gap: '8px' }}>
-                <button onClick={() => setCourseFilter(new Set(courses.map(c => c.id)))} style={{ fontSize: '12px', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}>전체 선택</button>
-                <button onClick={() => setCourseFilter(new Set())} style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}>초기화</button>
+                <button onClick={() => setCourseFilter(new Map(courses.map(c => [c.id, ''])))} style={{ fontSize: '12px', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}>전체 선택</button>
+                <button onClick={() => setCourseFilter(new Map())} style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}>초기화</button>
               </div>
             </div>
           )}
         </div>
         {(contactFilter !== 'all' || rankFilter !== 'all' || courseFilter.size > 0) && (
-          <button onClick={() => { setContactFilter('all'); setRankFilter('all'); setCourseFilter(new Set()); setCourseDropOpen(false); }} style={{ padding: '4px 10px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
+          <button onClick={() => { setContactFilter('all'); setRankFilter('all'); setCourseFilter(new Map()); setCourseDropOpen(false); }} style={{ padding: '4px 10px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
             필터 초기화
           </button>
         )}
