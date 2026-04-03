@@ -2,8 +2,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { logActivity } from '../../lib/activityLog';
+import { useToast } from '../components/Toast';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function CoursesPage() {
+  const toast = useToast();
   const [courses, setCourses] = useState([]);
   const [courseStats, setCourseStats] = useState({}); // { course_id: { count, lastIssued } }
   const [loading, setLoading] = useState(true);
@@ -54,13 +57,13 @@ export default function CoursesPage() {
   }, []);
 
   const handleAddCourse = async () => {
-    if (!newName.trim()) return alert("과정명을 입력해주세요.");
+    if (!newName.trim()) return toast.warning("과정명을 입력해주세요.");
     const { data, error } = await supabase.from('courses').insert([{ name: newName, category: newCat, description: newDesc, hours: Number(newHours) || 0, price: Number(newPrice) || 0, is_active: true }]).select();
     if (error) {
       if (error.message.includes('column "is_active"')) {
-        alert("⚠️ 시스템 알림: 아직 데이터베이스에 '숨김' 기능(is_active) 세팅이 완료되지 않았습니다!\n\nSupabase에서 [scripts/alter-courses.sql] 명령어를 먼저 실행해주세요.");
+        toast.error("DB에 is_active 컬럼이 없습니다. SQL을 실행해주세요.");
       } else {
-        alert("오류 발생: " + error.message);
+        toast.error("오류: " + error.message);
       }
     } else if (data) {
       logActivity({ action: 'create', targetType: 'course', targetId: data[0].id, targetName: newName, details: `신규 과정 등록 (${newCat})` });
@@ -77,7 +80,7 @@ export default function CoursesPage() {
     if (window.confirm(`이 과정을 [${actionTxt}] 상태로 변경하시겠습니까?\n숨김 처리해도 기존 수료 내역은 삭제되지 않습니다.`)) {
       const { error } = await supabase.from('courses').update({ is_active: newState }).eq('id', course.id);
       if (error) {
-        alert("업데이트 실패: " + error.message);
+        toast.error("업데이트 실패: " + error.message);
       } else {
         logActivity({ action: 'hide', targetType: 'course', targetId: course.id, targetName: course.name, details: actionTxt });
         setCourses(courses.map(c => c.id === course.id ? { ...c, is_active: newState } : c));
@@ -98,7 +101,7 @@ export default function CoursesPage() {
         logActivity({ action: 'delete', targetType: 'course', targetId: course.id, targetName: course.name, details: `과정 영구 삭제 (수료 ${stat.count}건 연쇄 삭제)` });
         setCourses(courses.filter(c => c.id !== course.id));
       } else {
-        alert("삭제 실패: " + error.message);
+        toast.error("삭제 실패: " + error.message);
       }
     }
   };
@@ -115,12 +118,12 @@ export default function CoursesPage() {
 
   // 과정 수정 저장
   const handleSaveEdit = async (courseId) => {
-    if (!editName.trim()) return alert("과정명을 입력해주세요.");
+    if (!editName.trim()) return toast.warning("과정명을 입력해주세요.");
     const { error } = await supabase.from('courses')
       .update({ name: editName, category: editCat, description: editDesc, hours: editHours || 0, price: editPrice || 0 })
       .eq('id', courseId);
     if (error) {
-      alert("수정 실패: " + error.message);
+      toast.error("수정 실패: " + error.message);
     } else {
       const oldCourse = courses.find(c => c.id === courseId);
       logActivity({ action: 'update', targetType: 'course', targetId: courseId, targetName: editName, details: `과정명: ${oldCourse?.name}→${editName}` });
@@ -159,7 +162,7 @@ export default function CoursesPage() {
       )}
 
       <div className="card">
-        {loading ? <p>데이터를 불러오는 중입니다...</p> : (
+        {loading ? <LoadingSpinner /> : (
           <table>
             <thead>
               <tr>
