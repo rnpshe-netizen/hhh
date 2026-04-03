@@ -41,6 +41,9 @@ export default function MembersPage() {
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editNameEn, setEditNameEn] = useState('');
+  const [editBirthDate, setEditBirthDate] = useState('');
+  const [editAddress, setEditAddress] = useState('');
   const [editMemo, setEditMemo] = useState('');
 
   // Phase 1.5: 수동 수료(발급) 연결 폼 상태
@@ -355,7 +358,9 @@ export default function MembersPage() {
   const openMemberDetail = async (member) => {
     setSelectedMember(member);
     setIsEditing(false);
-    setEditName(member.name); setEditPhone(member.phone || ''); setEditEmail(member.email || ''); setEditMemo(member.memo || '');
+    setEditName(member.name); setEditPhone(member.phone || ''); setEditEmail(member.email || '');
+    setEditNameEn(member.name_en || ''); setEditBirthDate(member.birth_date || ''); setEditAddress(member.address || '');
+    setEditMemo(member.memo || '');
     const { data } = await supabase.from('completions').select('id, issued_date, cohort, note, courses(id, name)').eq('member_id', member.id).order('issued_date', { ascending: false });
     setMemberCompletions(data || []);
   };
@@ -397,11 +402,17 @@ export default function MembersPage() {
       const { data: dup } = await supabase.from('members').select('id').eq('phone', editPhone.trim()).neq('id', selectedMember.id).limit(1);
       if (dup && dup.length > 0) return alert("이미 동일한 연락처를 사용하는 다른 회원이 있습니다.");
     }
-    const { error } = await supabase.from('members').update({ name: editName, phone: editPhone, email: editEmail, memo: editMemo || null }).eq('id', selectedMember.id);
+    const updatePayload = {
+      name: editName, phone: editPhone, email: editEmail,
+      name_en: editNameEn || null, birth_date: editBirthDate || null, address: editAddress || null,
+      memo: editMemo || null,
+    };
+    const { error } = await supabase.from('members').update(updatePayload).eq('id', selectedMember.id);
     if (!error) {
       logActivity({ action: 'update', targetType: 'member', targetId: selectedMember.id, targetName: editName, details: `이름: ${selectedMember.name}→${editName}, 연락처: ${selectedMember.phone||'없음'}→${editPhone||'없음'}` });
-      setMembers(members.map(m => m.id === selectedMember.id ? { ...m, name: editName, phone: editPhone, email: editEmail, memo: editMemo } : m));
-      setSelectedMember({ ...selectedMember, name: editName, phone: editPhone, email: editEmail, memo: editMemo });
+      const updated = { ...selectedMember, ...updatePayload };
+      setMembers(members.map(m => m.id === selectedMember.id ? { ...m, ...updatePayload } : m));
+      setSelectedMember(updated);
       setIsEditing(false);
       alert("정보가 성공적으로 수정되었습니다.");
     } else {
@@ -664,27 +675,59 @@ export default function MembersPage() {
               )}
 
               {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <input type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="이름" style={{ padding: '8px' }} />
-                  <input type="text" value={editPhone} onChange={e => setEditPhone(formatPhone(e.target.value))} placeholder="연락처 (예: 010-1234-5678)" style={{ padding: '8px' }}
-                    onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
-                  <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="이메일 (예: abc@email.com)" style={{ padding: '8px' }}
-                    onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
-                  <textarea value={editMemo} onChange={e => setEditMemo(e.target.value)} placeholder="메모 (내부 참고용)" rows={2}
-                    style={{ padding: '8px', resize: 'vertical', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px' }} />
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>이름 (한글)</label>
+                      <input type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="이름" style={{ padding: '8px', width: '100%', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>이름 (영문)</label>
+                      <input type="text" value={editNameEn} onChange={e => setEditNameEn(e.target.value)} placeholder="예: Hong Gil Dong" style={{ padding: '8px', width: '100%', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>연락처</label>
+                      <input type="text" value={editPhone} onChange={e => setEditPhone(formatPhone(e.target.value))} placeholder="010-1234-5678" style={{ padding: '8px', width: '100%', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }}
+                        onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>이메일</label>
+                      <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="abc@email.com" style={{ padding: '8px', width: '100%', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }}
+                        onKeyDown={e => { if (e.key === 'Enter') handleUpdateMember(); }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>생년월일</label>
+                      <input type="text" value={editBirthDate} onChange={e => setEditBirthDate(e.target.value)} placeholder="예: 1993-12-11" style={{ padding: '8px', width: '100%', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }} />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>주소</label>
+                      <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="도로명 주소" style={{ padding: '8px', width: '100%', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>메모</label>
+                    <textarea value={editMemo} onChange={e => setEditMemo(e.target.value)} placeholder="내부 참고용 메모" rows={2}
+                      style={{ padding: '8px', width: '100%', resize: 'vertical', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                     <button onClick={handleUpdateMember} style={{ flex: 1, padding: '10px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>저장하기</button>
                     <button onClick={handleHideMember} style={{ padding: '10px 20px', background: '#fef3c7', color: '#92400e', border: '1px solid #fbbf24', borderRadius: '4px', cursor: 'pointer' }}>숨기기</button>
                     <button onClick={handleDeleteMember} style={{ padding: '10px 20px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer' }}>영구 삭제</button>
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <div><strong>연락처:</strong> <span style={{color: selectedMember.phone ? 'black' : 'gray'}}>{selectedMember.phone || '없음'}</span></div>
-                  <div><strong>이메일:</strong> <span style={{color: selectedMember.email ? 'black' : 'gray'}}>{selectedMember.email || '없음'}</span></div>
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '14px' }}>
+                    <div><span style={{ color: '#6b7280' }}>연락처:</span> <strong>{selectedMember.phone || '없음'}</strong></div>
+                    <div><span style={{ color: '#6b7280' }}>이메일:</span> <strong style={{ color: selectedMember.email ? '#333' : '#ccc' }}>{selectedMember.email || '없음'}</strong></div>
+                    {selectedMember.name_en && <div><span style={{ color: '#6b7280' }}>영문이름:</span> <strong>{selectedMember.name_en}</strong></div>}
+                    {selectedMember.birth_date && <div><span style={{ color: '#6b7280' }}>생년월일:</span> <strong>{selectedMember.birth_date}</strong></div>}
+                    {selectedMember.address && <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#6b7280' }}>주소:</span> <strong>{selectedMember.address}</strong></div>}
+                  </div>
                   {selectedMember.memo && (
-                    <div style={{ gridColumn: '1 / -1', marginTop: '4px' }}>
-                      <strong>메모:</strong> <span style={{ color: '#6b7280', fontSize: '13px' }}>{selectedMember.memo}</span>
+                    <div style={{ marginTop: '10px', padding: '8px 12px', backgroundColor: '#f0f9ff', borderRadius: '4px', border: '1px solid #bae6fd' }}>
+                      <span style={{ fontSize: '12px', color: '#0369a1', fontWeight: 'bold' }}>📝 메모:</span>
+                      <span style={{ fontSize: '13px', color: '#374151', marginLeft: '8px' }}>{selectedMember.memo}</span>
                     </div>
                   )}
                 </div>
