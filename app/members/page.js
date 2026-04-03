@@ -385,12 +385,16 @@ export default function MembersPage() {
       from += batchSize;
     }
 
-    const header = ['이름', '시스템 등록일', '연락처', '이메일'];
+    const header = ['이름', '영문이름', '생년월일', '연락처', '이메일', '주소', '보유자격', '시스템 등록일'];
     const rows = allMembers.map(m => [
       m.name,
-      new Date(m.created_at).toLocaleDateString(),
+      m.name_en || '',
+      m.birth_date || '',
       m.phone || '',
-      m.email || ''
+      m.email || '',
+      m.address || '',
+      m.current_cert || '',
+      new Date(m.created_at).toLocaleDateString(),
     ]);
     // 한글 깨짐 방지를 위해 BOM(\uFEFF) 추가
     const csvContent = "\uFEFF" + [header.join(','), ...rows.map(r => r.map(v => `"${(v || '').replace(/"/g, '""')}"`).join(','))].join('\n');
