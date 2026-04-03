@@ -7,6 +7,18 @@ import { BarChart, Bar, XAxis as BarXAxis, YAxis as BarYAxis, Tooltip as BarTool
 
 const COLORS = ['#4A90E2', '#00C49F', '#FFBB28', '#FF8042', '#A28DFF', '#FF6B6B', '#4ADEDE', '#845EC2'];
 
+// 차트 데이터 비어있을 때 안내 메시지
+function ChartEmpty({ message = '표시할 데이터가 없습니다' }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#9ca3af', fontSize: '14px' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '36px', marginBottom: '8px' }}>📊</div>
+        {message}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardClient({ pieData, trendData, barData, courseIdMap }) {
   const router = useRouter();
 
@@ -27,6 +39,7 @@ export default function DashboardClient({ pieData, trendData, barData, courseIdM
       <div className="card" style={{ gridColumn: '1 / -1' }}>
         <h3 style={{ marginBottom: '24px', fontSize: '16px', color: 'var(--secondary)' }}>연도별 훈련원 수료생 획득 추이</h3>
         <div style={{ height: 320 }}>
+          {trendData.length === 0 ? <ChartEmpty message="수료 기록이 없어 추이를 표시할 수 없습니다" /> :
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
               <defs>
@@ -41,7 +54,7 @@ export default function DashboardClient({ pieData, trendData, barData, courseIdM
               <LineTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
               <Area type="monotone" dataKey="count" stroke="#4A90E2" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" name="신규 수료 건수" />
             </AreaChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer>}
         </div>
       </div>
 
