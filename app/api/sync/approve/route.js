@@ -40,22 +40,26 @@ export async function POST(request) {
         name_en: formData.nameEn || null,
         birth_date: formData.birthDate || null,
         address: formData.address || null,
+        current_cert: formData.currentCert || null,
       }]).select().single();
 
       if (insertErr) return NextResponse.json({ error: '회원 등록 실패: ' + insertErr.message }, { status: 500 });
 
-      // 신청 과정 연결
+      // 신청 과정 → enrollments에 등록 (수료가 아닌 신청 이력)
       const courseChange = approvedChanges.find(c => c.field === 'course' && c.approved);
       if (courseChange && formData.courseName) {
+        const courseNameClean = formData.courseName.split('(')[0].trim();
         const { data: course } = await supabase.from('courses')
-          .select('id').ilike('name', `%${formData.courseName.split('(')[0].trim()}%`).limit(1);
-        if (course && course.length > 0) {
-          await supabase.from('completions').insert([{
-            member_id: newMember.id,
-            course_id: course[0].id,
-            note: formData.isRetake ? '재수강' : '구글폼 신청',
-          }]);
-        }
+          .select('id, price').ilike('name', `%${courseNameClean}%`).limit(1);
+        await supabase.from('enrollments').insert([{
+          member_id: newMember.id,
+          course_id: course?.[0]?.id || null,
+          course_name: formData.courseName,
+          amount: course?.[0]?.price || 0,
+          is_retake: formData.isRetake || false,
+          extra_cert: formData.extraCert ? true : false,
+          payment_status: 'pending',
+        }]);
       }
 
       await supabase.from('pending_syncs').update({
@@ -76,17 +80,20 @@ export async function POST(request) {
         if (change.field === 'email') {
           updates.email = change.new;
         } else if (change.field === 'course') {
-          // 과정 연결
+          // 과정 신청 → enrollments에 등록
           const courseName = change.new;
+          const courseNameClean = courseName.split('(')[0].trim();
           const { data: course } = await supabase.from('courses')
-            .select('id').ilike('name', `%${courseName.split('(')[0].trim()}%`).limit(1);
-          if (course && course.length > 0) {
-            await supabase.from('completions').insert([{
-              member_id: memberId,
-              course_id: course[0].id,
-              note: change.isRetake ? '재수강' : '구글폼 신청',
-            }]);
-          }
+            .select('id, price').ilike('name', `%${courseNameClean}%`).limit(1);
+          await supabase.from('enrollments').insert([{
+            member_id: memberId,
+            course_id: course?.[0]?.id || null,
+            course_name: courseName,
+            amount: course?.[0]?.price || 0,
+            is_retake: change.isRetake || false,
+            extra_cert: false,
+            payment_status: 'pending',
+          }]);
         }
       }
 
