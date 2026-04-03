@@ -2,10 +2,14 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { logActivity } from '../../lib/activityLog';
+import { useToast } from '../components/Toast';
+import LoadingSpinner from '../components/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 
 const PAGE_SIZE = 50;
 
 export default function MembersPage() {
+  const toast = useToast();
   const [members, setMembers] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
@@ -77,11 +81,12 @@ export default function MembersPage() {
       (data || []).forEach(row => {
         if (!row.cohort) return;
         if (!map[row.course_id]) map[row.course_id] = new Set();
-        map[row.course_id].add(row.cohort);
+        // "10" → "10기", "10기" → "10기" 로 통일
+        const normalized = String(row.cohort).replace(/기$/, '').trim() + '기';
+        map[row.course_id].add(normalized);
       });
       const result = {};
       for (const [courseId, cohortSet] of Object.entries(map)) {
-        // 기수를 숫자 기준으로 정렬 (1기, 2기, ... 10기, 11기)
         result[courseId] = [...cohortSet].sort((a, b) => {
           const numA = parseInt(a) || 0;
           const numB = parseInt(b) || 0;
@@ -149,15 +154,19 @@ export default function MembersPage() {
       const courseIds = [...courseFilter.keys()];
       const cohortFilters = [...courseFilter.entries()].filter(([_, cohort]) => cohort.trim());
 
-      query = supabase.from('members')
-        .select('*, completions!inner(course_id, cohort)', { count: 'exact' })
-        .in('completions.course_id', courseIds);
-
-      // 기수 필터가 있는 과정은 cohort도 매칭
-      if (cohortFilters.length > 0) {
-        // 기수가 입력된 과정들에 대해 OR 조건으로 cohort 필터
-        const cohortConditions = cohortFilters.map(([_, cohort]) => `completions.cohort.ilike.%${cohort.trim()}%`).join(',');
-        query = query.or(cohortConditions);
+      // 기수 필터가 있으면 해당 cohort도 inner join 조건에 포함
+      if (cohortFilters.length === 1 && courseIds.length === 1) {
+        // 단일 과정+기수: 정확한 cohort 매칭 (숫자만 또는 "기" 포함 모두)
+        const cohortVal = cohortFilters[0][1].replace(/기$/, '').trim();
+        query = supabase.from('members')
+          .select('*, completions!inner(course_id, cohort)', { count: 'exact' })
+          .in('completions.course_id', courseIds)
+          .or(`completions.cohort.eq.${cohortVal},completions.cohort.eq.${cohortVal}기`);
+      } else {
+        // 다중 과정 또는 기수 없음: 과정 ID만 필터
+        query = supabase.from('members')
+          .select('*, completions!inner(course_id, cohort)', { count: 'exact' })
+          .in('completions.course_id', courseIds);
       }
 
       // 기존 필터 재적용 (검색, 연락처)
@@ -182,9 +191,25 @@ export default function MembersPage() {
 
       query = query.order(sortField, { ascending: sortAsc }).range(from, to);
       const { data, count } = await query;
-      // completions 필드 제거 후 반환 (중복 회원 제거)
+      // completions 필드 제거 + 중복 회원 제거 + 다중 기수 클라이언트 필터
       const seen = new Set();
-      const uniqueMembers = (data || []).filter(m => {
+      let filteredData = (data || []);
+
+      // 다중 과정+기수 혼합 시 클라이언트에서 추가 필터링
+      if (cohortFilters.length > 0 && (courseIds.length > 1 || cohortFilters.length > 1)) {
+        filteredData = filteredData.filter(m => {
+          const comps = m.completions || [];
+          return comps.some(comp => {
+            const selectedCohort = courseFilter.get(comp.course_id);
+            if (!selectedCohort) return true; // 기수 미지정 과정
+            const cohortNum = selectedCohort.replace(/기$/, '').trim();
+            const compCohort = String(comp.cohort || '').replace(/기$/, '').trim();
+            return compCohort === cohortNum;
+          });
+        });
+      }
+
+      const uniqueMembers = filteredData.filter(m => {
         if (seen.has(m.id)) return false;
         seen.add(m.id);
         return true;
@@ -298,10 +323,10 @@ export default function MembersPage() {
     const { error } = await supabase.from('members').delete().in('id', ids);
     if (!error) {
       logActivity({ action: 'delete', targetType: 'member', targetName: `${ids.length}명 일괄`, details: `일괄 삭제: ${deletedNames.slice(0, 5).join(', ')}${deletedNames.length > 5 ? ' 외 ' + (deletedNames.length - 5) + '명' : ''}` });
-      alert(`${ids.length}명 삭제 완료`);
+      toast.success(`${ids.length}명 삭제 완료`);
       fetchMembers();
     } else {
-      alert("삭제 실패: " + error.message);
+      toast.error("삭제 실패: " + error.message);
     }
   };
 
@@ -367,17 +392,17 @@ export default function MembersPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    alert(`총 ${allMembers.length}명의 데이터를 CSV로 추출했습니다.`);
+    toast.success(`총 ${allMembers.length}명의 데이터를 CSV로 추출했습니다.`);
   };
 
   const handleAddMember = async () => {
-    if (!newName.trim()) return alert("이름을 입력해주세요.");
+    if (!newName.trim()) return toast.warning("이름을 입력해주세요.");
     if (newPhone.trim()) {
       const { data: dup } = await supabase.from('members').select('id').eq('phone', newPhone.trim()).limit(1);
-      if (dup && dup.length > 0) return alert("이미 동일한 연락처로 등록된 회원이 있습니다!");
+      if (dup && dup.length > 0) return toast.warning("이미 동일한 연락처로 등록된 회원이 있습니다!");
     }
     const { data, error } = await supabase.from('members').insert([{ name: newName, phone: newPhone, email: newEmail }]).select();
-    if (error) { alert("오류 발생: " + error.message); }
+    if (error) { toast.error("오류 발생: " + error.message); }
     else if (data) {
       logActivity({ action: 'create', targetType: 'member', targetId: data[0].id, targetName: newName, details: `신규 회원 등록 (연락처: ${newPhone || '없음'})` });
       setIsAdding(false); setNewName(''); setNewPhone(''); setNewEmail('');
@@ -426,16 +451,16 @@ export default function MembersPage() {
   const isValidEmail = (email) => !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleUpdateMember = async () => {
-    if (!editName.trim()) return alert("이름을 입력해주세요.");
+    if (!editName.trim()) return toast.warning("이름을 입력해주세요.");
     if (editPhone.trim() && !/^01[016789]-?\d{3,4}-?\d{4}$/.test(editPhone.replace(/-/g, ''))) {
-      return alert("전화번호 형식이 올바르지 않습니다.\n예: 010-1234-5678");
+      return toast.warning("전화번호 형식이 올바르지 않습니다. 예: 010-1234-5678");
     }
     if (editEmail.trim() && !isValidEmail(editEmail)) {
-      return alert("이메일 형식이 올바르지 않습니다.\n예: example@email.com");
+      return toast.warning("이메일 형식이 올바르지 않습니다. 예: example@email.com");
     }
     if (editPhone.trim() && editPhone !== selectedMember.phone) {
       const { data: dup } = await supabase.from('members').select('id').eq('phone', editPhone.trim()).neq('id', selectedMember.id).limit(1);
-      if (dup && dup.length > 0) return alert("이미 동일한 연락처를 사용하는 다른 회원이 있습니다.");
+      if (dup && dup.length > 0) return toast.warning("이미 동일한 연락처를 사용하는 다른 회원이 있습니다.");
     }
     const updatePayload = {
       name: editName, phone: editPhone, email: editEmail,
@@ -449,9 +474,9 @@ export default function MembersPage() {
       setMembers(members.map(m => m.id === selectedMember.id ? { ...m, ...updatePayload } : m));
       setSelectedMember(updated);
       setIsEditing(false);
-      alert("정보가 성공적으로 수정되었습니다.");
+      toast.success("정보가 성공적으로 수정되었습니다.");
     } else {
-      alert("수정 실패: " + error.message);
+      toast.error("수정 실패: " + error.message);
     }
   };
 
@@ -465,9 +490,9 @@ export default function MembersPage() {
         fetchMembers();
       } else {
         if (error.message.includes('is_active')) {
-          alert("⚠️ 아직 데이터베이스에 숨김 기능(is_active 컬럼)이 세팅되지 않았습니다.\n\nSupabase SQL Editor에서 scripts/alter-members.sql을 실행해주세요.");
+          toast.error("아직 데이터베이스에 숨김 기능(is_active 컬럼)이 세팅되지 않았습니다.");
         } else {
-          alert("숨김 처리 실패: " + error.message);
+          toast.error("숨김 처리 실패: " + error.message);
         }
       }
     }
@@ -483,13 +508,13 @@ export default function MembersPage() {
         closeMemberDetail();
         fetchMembers();
       } else {
-        alert("삭제 실패: " + error.message);
+        toast.error("삭제 실패: " + error.message);
       }
     }
   };
 
   const handleIssueCourse = async () => {
-    if (!issueCourseId) return alert("발급할(연결할) 과정을 선택하세요.");
+    if (!issueCourseId) return toast.warning("발급할 과정을 선택하세요.");
     const payload = { member_id: selectedMember.id, course_id: issueCourseId, issued_date: issueDate || null, cohort: issueCohort || null };
     const { data, error } = await supabase.from('completions').insert([payload]).select('id, issued_date, cohort, courses(id, name)');
     if (!error) {
@@ -498,7 +523,7 @@ export default function MembersPage() {
       setMemberCompletions([data[0], ...memberCompletions]);
       setIssueCourseId(''); setIssueDate(''); setIssueCohort('');
     } else {
-      alert("발급 오류: " + error.message);
+      toast.error("발급 오류: " + error.message);
     }
   };
 
@@ -667,7 +692,7 @@ export default function MembersPage() {
 
       {/* 회원 테이블 */}
       <div className="card">
-        {loading ? <p>서버에서 회원 데이터를 찾는 중입니다...</p> : (
+        {loading ? <LoadingSpinner message="서버에서 회원 데이터를 찾는 중입니다..." /> : (
           <table>
             <thead>
               <tr>
@@ -692,7 +717,7 @@ export default function MembersPage() {
                   <td style={{ color: m.email ? 'var(--text-main)' : '#ccc' }} onClick={() => openMemberDetail(m)}>{m.email || '-'}</td>
                 </tr>
               ))}
-              {members.length === 0 && <tr><td colSpan="5" style={{textAlign: 'center', padding: '24px'}}>검색 결과가 없습니다.</td></tr>}
+              {members.length === 0 && <tr><td colSpan="5"><EmptyState icon="🔍" title="검색 결과가 없습니다" description="다른 검색어나 필터를 시도해보세요" /></td></tr>}
             </tbody>
           </table>
         )}

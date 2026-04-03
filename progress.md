@@ -90,6 +90,10 @@
 - [x] 코드 품질 리팩토링 — 공통 유틸(lib/utils.js) + 공통 UI 컴포넌트 5종(Toast/LoadingSpinner/EmptyState/ConfirmDialog/Pagination)
 - [x] UX 개선 — 토스트 알림 시스템(layout 연결), 테이블 호버 통일, KPI 카드 호버 효과, 차트 빈 데이터 안내
 - [x] 전 페이지(8개) 콘솔 에러 0건 확인
+- [x] alert() → Toast 교체 (회원 관리 17건 + 과정 관리 7건)
+- [x] 로딩 텍스트 → LoadingSpinner 컴포넌트 교체
+- [x] 빈 상태 → EmptyState 컴포넌트 교체
+- [x] 기수 필터 버그 수정 — cohort "10"↔"10기" 통일 + 다중 과정+기수 클라이언트 필터링
 
 ### Phase 3: 수료증/자격증 자동 발급 `[░░░░░░░░░░] 0%` ⏳
 - [ ] PDF 웹 템플릿 생성/출력 엔진
