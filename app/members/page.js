@@ -35,6 +35,7 @@ export default function MembersPage() {
   // Phase 1.5: 회원 상세 / 수정 / 삭제 상태
   const [selectedMember, setSelectedMember] = useState(null);
   const [memberCompletions, setMemberCompletions] = useState([]);
+  const [memberEnrollments, setMemberEnrollments] = useState([]);
   const [courses, setCourses] = useState([]);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -44,6 +45,7 @@ export default function MembersPage() {
   const [editNameEn, setEditNameEn] = useState('');
   const [editBirthDate, setEditBirthDate] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editCurrentCert, setEditCurrentCert] = useState('');
   const [editMemo, setEditMemo] = useState('');
 
   // Phase 1.5: 수동 수료(발급) 연결 폼 상태
@@ -360,9 +362,13 @@ export default function MembersPage() {
     setIsEditing(false);
     setEditName(member.name); setEditPhone(member.phone || ''); setEditEmail(member.email || '');
     setEditNameEn(member.name_en || ''); setEditBirthDate(member.birth_date || ''); setEditAddress(member.address || '');
-    setEditMemo(member.memo || '');
-    const { data } = await supabase.from('completions').select('id, issued_date, cohort, note, courses(id, name)').eq('member_id', member.id).order('issued_date', { ascending: false });
-    setMemberCompletions(data || []);
+    setEditCurrentCert(member.current_cert || ''); setEditMemo(member.memo || '');
+    const [{ data: compData }, { data: enrData }] = await Promise.all([
+      supabase.from('completions').select('id, issued_date, cohort, note, courses(id, name)').eq('member_id', member.id).order('issued_date', { ascending: false }),
+      supabase.from('enrollments').select('*').eq('member_id', member.id).order('applied_at', { ascending: false }),
+    ]);
+    setMemberCompletions(compData || []);
+    setMemberEnrollments(enrData || []);
   };
 
   const closeMemberDetail = () => {
@@ -405,7 +411,7 @@ export default function MembersPage() {
     const updatePayload = {
       name: editName, phone: editPhone, email: editEmail,
       name_en: editNameEn || null, birth_date: editBirthDate || null, address: editAddress || null,
-      memo: editMemo || null,
+      current_cert: editCurrentCert || null, memo: editMemo || null,
     };
     const { error } = await supabase.from('members').update(updatePayload).eq('id', selectedMember.id);
     if (!error) {
@@ -703,6 +709,15 @@ export default function MembersPage() {
                       <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>주소</label>
                       <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="도로명 주소" style={{ padding: '8px', width: '100%', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }} />
                     </div>
+                    <div>
+                      <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>보유 자격</label>
+                      <select value={editCurrentCert} onChange={e => setEditCurrentCert(e.target.value)} style={{ padding: '8px', width: '100%', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }}>
+                        <option value="">없음</option>
+                        <option value="ACC">ACC</option>
+                        <option value="PCC">PCC</option>
+                        <option value="MCC">MCC</option>
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>메모</label>
@@ -723,6 +738,7 @@ export default function MembersPage() {
                     <div><span style={{ color: '#6b7280' }}>영문이름:</span> <strong style={{ color: selectedMember.name_en ? '#333' : '#ccc' }}>{selectedMember.name_en || '-'}</strong></div>
                     <div><span style={{ color: '#6b7280' }}>생년월일:</span> <strong style={{ color: selectedMember.birth_date ? '#333' : '#ccc' }}>{selectedMember.birth_date || '-'}</strong></div>
                     <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#6b7280' }}>주소:</span> <strong style={{ color: selectedMember.address ? '#333' : '#ccc' }}>{selectedMember.address || '-'}</strong></div>
+                    <div><span style={{ color: '#6b7280' }}>보유 자격:</span> <strong style={{ color: selectedMember.current_cert ? '#333' : '#ccc' }}>{selectedMember.current_cert || '-'}</strong></div>
                   </div>
                   {selectedMember.memo && (
                     <div style={{ marginTop: '10px', padding: '8px 12px', backgroundColor: '#f0f9ff', borderRadius: '4px', border: '1px solid #bae6fd' }}>
@@ -732,6 +748,57 @@ export default function MembersPage() {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* 수강 신청 이력 */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', color: '#374151', marginBottom: '12px' }}>📋 수강 신청 이력</h3>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                {memberEnrollments.length === 0 ? (
+                  <li style={{ padding: '16px', textAlign: 'center', color: 'gray' }}>신청 이력이 없습니다.</li>
+                ) : memberEnrollments.map(enr => (
+                  <li key={enr.id} style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <div>
+                        <strong>{enr.course_name || enr.courses?.name || '-'}</strong>
+                        {enr.is_retake && <span style={{ marginLeft: '8px', padding: '1px 6px', borderRadius: '4px', fontSize: '11px', backgroundColor: '#fef3c7', color: '#d97706' }}>재수강</span>}
+                        {enr.extra_cert && <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '4px', fontSize: '11px', backgroundColor: '#e0e7ff', color: '#4338ca' }}>추가수료증</span>}
+                      </div>
+                      <span style={{ fontSize: '12px', color: '#9ca3af' }}>{enr.applied_at ? new Date(enr.applied_at).toLocaleDateString() : '-'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                      <span style={{ color: '#6b7280' }}>참가비: <strong>{enr.amount ? enr.amount.toLocaleString() + '원' : '-'}</strong></span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>입금:</span>
+                        <select value={enr.payment_status || 'pending'} onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          await supabase.from('enrollments').update({
+                            payment_status: newStatus,
+                            payment_confirmed_at: newStatus === 'confirmed' ? new Date().toISOString() : null,
+                            payment_confirmed_by: newStatus === 'confirmed' ? 'admin' : null,
+                          }).eq('id', enr.id);
+                          setMemberEnrollments(prev => prev.map(x => x.id === enr.id ? { ...x, payment_status: newStatus } : x));
+                          logActivity({ action: 'update', targetType: 'enrollment', targetId: enr.id, targetName: selectedMember.name, details: `입금 상태: ${newStatus}` });
+                        }} style={{
+                          padding: '2px 8px', fontSize: '12px', borderRadius: '4px', cursor: 'pointer',
+                          border: '1px solid #d1d5db',
+                          backgroundColor: enr.payment_status === 'confirmed' ? '#dcfce7' : enr.payment_status === 'refunded' ? '#fee2e2' : '#fff',
+                          color: enr.payment_status === 'confirmed' ? '#16a34a' : enr.payment_status === 'refunded' ? '#dc2626' : '#374151',
+                        }}>
+                          <option value="pending">미확인</option>
+                          <option value="confirmed">확인 완료</option>
+                          <option value="refunded">환불</option>
+                        </select>
+                      </div>
+                    </div>
+                    {enr.payment_status === 'confirmed' && enr.payment_confirmed_at && (
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px', textAlign: 'right' }}>
+                        확인일: {new Date(enr.payment_confirmed_at).toLocaleString()}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
 
             {/* 수동 수료증 발급 관제소 */}
