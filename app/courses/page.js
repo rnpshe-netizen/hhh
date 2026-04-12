@@ -35,7 +35,7 @@ export default function CoursesPage() {
       // 과정 목록 + 수료 통계를 병렬로 조회
       // Supabase 기본 1,000건 제한 회피를 위해 릴레이 패치
       const [{ data: coursesData }, ...completionBatches] = await Promise.all([
-        supabase.from('courses').select('*').order('created_at', { ascending: true }),
+        supabase.from('courses').select('*').order('name', { ascending: true }),
         ...[0, 1000, 2000, 3000, 4000, 5000, 6000].map(offset =>
           supabase.from('completions').select('course_id, issued_date').range(offset, offset + 999)
         ),
@@ -185,7 +185,9 @@ export default function CoursesPage() {
                 <th>설명</th>
                 <th style={{ textAlign: 'center' }}>수료자</th>
                 <th>최근 발급일</th>
-                <th>설정</th>
+                <th style={{ textAlign: 'center' }}>수정</th>
+                <th style={{ textAlign: 'center' }}>상태</th>
+                <th style={{ textAlign: 'center' }}>삭제</th>
               </tr>
             </thead>
             <tbody>
@@ -249,38 +251,53 @@ export default function CoursesPage() {
                     <td style={{ color: stat.lastIssued ? 'var(--text-main)' : '#ccc', fontSize: '13px' }}>
                       {stat.lastIssued || '-'}
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {isEditing ? (
-                          <>
-                            <button onClick={() => handleSaveEdit(c.id)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid var(--primary)', backgroundColor: 'var(--primary)', color: '#fff' }}>
-                              저장
-                            </button>
-                            <button onClick={() => setEditingId(null)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff' }}>
-                              취소
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button onClick={() => startEdit(c)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff' }}>
-                              ✏️ 수정
-                            </button>
-                            <button onClick={() => handleToggleActive(c)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff' }}>
-                              {c.is_active === false ? '👁️ 해제' : '🙈 숨김'}
-                            </button>
-                            <button onClick={() => handleDeleteCourse(c)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#dc2626', opacity: 0.5 }}
-                              onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                              onMouseLeave={e => e.currentTarget.style.opacity = 0.5}>
-                              🗑️
-                            </button>
-                          </>
-                        )}
-                      </div>
+                    {/* 수정 */}
+                    <td style={{ textAlign: 'center' }}>
+                      {isEditing ? (
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          <button onClick={() => handleSaveEdit(c.id)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: 'none', backgroundColor: 'var(--primary)', color: '#fff' }}>저장</button>
+                          <button onClick={() => setEditingId(null)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff' }}>취소</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => startEdit(c)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fff' }}>✏️</button>
+                      )}
+                    </td>
+                    {/* 상태 — 드롭다운 */}
+                    <td style={{ textAlign: 'center' }}>
+                      <select value={c.is_active === false ? 'inactive' : 'active'}
+                        onChange={async (e) => {
+                          const newActive = e.target.value === 'active';
+                          const { error } = await supabase.from('courses').update({ is_active: newActive }).eq('id', c.id);
+                          if (!error) {
+                            logActivity({ action: 'hide', targetType: 'course', targetId: c.id, targetName: c.name, details: newActive ? '운영 재개' : '운영 종료' });
+                            setCourses(courses.map(x => x.id === c.id ? { ...x, is_active: newActive } : x));
+                          } else {
+                            toast.error('상태 변경 실패: ' + error.message);
+                          }
+                        }}
+                        style={{
+                          padding: '3px 8px', fontSize: '12px', borderRadius: '4px', cursor: 'pointer',
+                          border: '1px solid #d1d5db',
+                          backgroundColor: c.is_active === false ? '#fee2e2' : '#dcfce7',
+                          color: c.is_active === false ? '#dc2626' : '#16a34a',
+                          fontWeight: 'bold',
+                        }}>
+                        <option value="active">🟢 운영중</option>
+                        <option value="inactive">🔴 비운영</option>
+                      </select>
+                    </td>
+                    {/* 삭제 */}
+                    <td style={{ textAlign: 'center' }}>
+                      <button onClick={() => handleDeleteCourse(c)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#dc2626', opacity: 0.5 }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                        onMouseLeave={e => e.currentTarget.style.opacity = 0.5}>
+                        🗑️
+                      </button>
                     </td>
                   </tr>
                 );
               })}
-              {courses.length === 0 && <tr><td colSpan="9"><EmptyState icon="📚" title="등록된 과정이 없습니다" /></td></tr>}
+              {courses.length === 0 && <tr><td colSpan="11"><EmptyState icon="📚" title="등록된 과정이 없습니다" /></td></tr>}
             </tbody>
           </table>
         )}

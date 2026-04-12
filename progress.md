@@ -103,6 +103,7 @@
 - [x] 공통 컴포넌트 전 페이지 일괄 적용 — alert 0건, Toast 전 페이지, Spinner/EmptyState/Pagination/ConfirmDialog 적용
 - [x] QA 잔여 결함 3건 수정 완료 — Toast.js useCallback 제거, lib/utils.js import 적용(중복 4개 삭제), CSS 중복 제거
 - [x] 과정 일정 관리 — schedules 테이블(30건) + 동기화 컬럼 I열 일정 추가 + 모달/동기화 UI 📅 일정 표시
+- [x] 과정 관리 개선 — 기존 7과정 시간/참가비 DB 업데이트 + 설정 컬럼 3분할(수정/상태드롭다운/삭제) + name순 정렬
 
 ### Phase 3: 수료증/자격증 자동 발급 `[░░░░░░░░░░] 0%` ⏳
 - [ ] PDF 웹 템플릿 생성/출력 엔진
