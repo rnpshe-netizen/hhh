@@ -163,6 +163,7 @@ export default function SyncPage() {
                   <div><strong>생년월일:</strong> {fd.birthDate || '-'}</div>
                   <div style={{ gridColumn: '1 / -1' }}><strong>주소:</strong> {fd.address || '-'}</div>
                   {fd.courseName && <div style={{ gridColumn: '1 / -1' }}><strong>신청 과정:</strong> {fd.courseName}</div>}
+                  {fd.scheduleText && <div style={{ gridColumn: '1 / -1' }}><strong>📅 신청 일정:</strong> <span style={{ color: '#4A90E2' }}>{fd.scheduleText}</span></div>}
                 </div>
 
                 {/* 변경사항 — 필드별 승인/거부 */}
