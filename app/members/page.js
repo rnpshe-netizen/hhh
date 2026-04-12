@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { logActivity } from '../../lib/activityLog';
+import { formatPhone, isValidEmail, pgBtnStyle, getPageNumbers } from '../../lib/utils';
 import { useToast } from '../components/Toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -452,16 +453,7 @@ export default function MembersPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedMember]);
 
-  // 전화번호 자동 포맷팅 (숫자만 입력해도 010-XXXX-XXXX 형태로)
-  const formatPhone = (value) => {
-    const digits = value.replace(/[^0-9]/g, '');
-    if (digits.length <= 3) return digits;
-    if (digits.length <= 7) return digits.slice(0, 3) + '-' + digits.slice(3);
-    return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
-  };
-
-  // 이메일 형식 검증
-  const isValidEmail = (email) => !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  // formatPhone, isValidEmail → lib/utils.js에서 import
 
   const handleUpdateMember = async () => {
     if (!editName.trim()) return toast.warning("이름을 입력해주세요.");
@@ -567,15 +559,7 @@ export default function MembersPage() {
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(page * PAGE_SIZE, totalCount);
 
-  // 페이지 번호 목록 생성 (최대 7개 표시)
-  const getPageNumbers = () => {
-    const pages = [];
-    let start = Math.max(1, page - 3);
-    let end = Math.min(totalPages, start + 6);
-    if (end - start < 6) start = Math.max(1, end - 6);
-    for (let i = start; i <= end; i++) pages.push(i);
-    return pages;
-  };
+  // getPageNumbers → lib/utils.js에서 import
 
   const isAllSelected = members.length > 0 && members.every(m => selectedIds.has(m.id));
 
@@ -754,7 +738,7 @@ export default function MembersPage() {
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
             <button onClick={() => setPage(1)} disabled={page === 1} style={pgBtnStyle(page === 1)}>«</button>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={pgBtnStyle(page === 1)}>‹</button>
-            {getPageNumbers().map(p => (
+            {getPageNumbers(page, totalPages).map(p => (
               <button key={p} onClick={() => setPage(p)} style={{
                 ...pgBtnStyle(false),
                 backgroundColor: p === page ? 'var(--primary)' : '#fff',
@@ -991,17 +975,4 @@ export default function MembersPage() {
   );
 }
 
-// 페이지네이션 버튼 스타일
-function pgBtnStyle(disabled) {
-  return {
-    padding: '6px 12px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    backgroundColor: disabled ? '#f9fafb' : '#fff',
-    color: disabled ? '#d1d5db' : '#374151',
-    cursor: disabled ? 'default' : 'pointer',
-    fontSize: '14px',
-    minWidth: '36px',
-    textAlign: 'center',
-  };
-}
+// pgBtnStyle → lib/utils.js에서 import
