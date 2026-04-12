@@ -17,14 +17,6 @@ export function ToastProvider({ children }) {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
   }, []);
 
-  const toast = useCallback({
-    success: (msg) => addToast(msg, 'success'),
-    error: (msg) => addToast(msg, 'error', 5000),
-    warning: (msg) => addToast(msg, 'warning', 4000),
-    info: (msg) => addToast(msg, 'info'),
-  }, [addToast]);
-
-  // useCallback으로 감싼 객체는 안 됨 — 수정
   const toastObj = {
     success: (msg) => addToast(msg, 'success'),
     error: (msg) => addToast(msg, 'error', 5000),
