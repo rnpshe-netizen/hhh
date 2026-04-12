@@ -64,8 +64,11 @@ export async function POST(request) {
       const rowNum = i + 2;
 
       // N열이 TRUE면 이미 처리 완료
-      if (row[13] === 'TRUE') { skipped++; continue; }
+      if (row[14] === 'TRUE') { skipped++; continue; } // O열: 동기화여부
 
+      // 컬럼 매핑 (2026-04-04 구글 폼 업데이트 반영)
+      // A:Timestamp B:이름한글 C:이름영문 D:생년월일 E:연락처 F:이메일 G:주소
+      // H:신청과정 I:신청일정 J:참가비확인 K:재수강 L:추가수료증 M:보유자격 N:기타 O:동기화
       const name = (row[1] || '').trim();
       const nameEn = (row[2] || '').trim();
       const birthDate = (row[3] || '').trim();
@@ -73,16 +76,17 @@ export async function POST(request) {
       const email = (row[5] || '').trim();
       const address = (row[6] || '').trim();
       const courseName = (row[7] || '').trim();
-      const isRetake = (row[9] || '').includes('재수강');
-      const extraCert = (row[10] || '').trim();
-      const currentCert = (row[11] || '').trim();
-      const note = (row[12] || '').trim();
+      const scheduleText = (row[8] || '').trim();  // I열: 신청 일정
+      const isRetake = (row[10] || '').includes('재수강'); // K열
+      const extraCert = (row[11] || '').trim();  // L열
+      const currentCert = (row[12] || '').trim(); // M열
+      const note = (row[13] || '').trim();  // N열
 
       if (!name) { skipped++; continue; }
 
       const formData = {
         name, nameEn, birthDate, phone, email, address,
-        courseName, isRetake, extraCert, currentCert, note,
+        courseName, scheduleText, isRetake, extraCert, currentCert, note,
         timestamp: row[0] || '',
       };
 
@@ -123,7 +127,7 @@ export async function POST(request) {
         }
         // 신청 과정은 항상 변경사항에 포함
         if (courseName) {
-          changes.push({ field: 'course', label: '신청 과정', old: null, new: courseName, approved: null, isRetake });
+          changes.push({ field: 'course', label: '신청 과정', old: null, new: courseName, approved: null, isRetake, scheduleText });
         }
 
         const { error } = await supabase.from('pending_syncs').insert([{
@@ -146,7 +150,7 @@ export async function POST(request) {
 
         const changes = [];
         if (courseName) {
-          changes.push({ field: 'course', label: '신청 과정', old: null, new: courseName, approved: null, isRetake });
+          changes.push({ field: 'course', label: '신청 과정', old: null, new: courseName, approved: null, isRetake, scheduleText });
         }
 
         const { error } = await supabase.from('pending_syncs').insert([{
@@ -166,7 +170,7 @@ export async function POST(request) {
       try {
         await sheets.spreadsheets.values.update({
           spreadsheetId: sheetId,
-          range: `${actualTab}!N${rowNum}`,
+          range: `${actualTab}!O${rowNum}`, // O열: 동기화여부
           valueInputOption: 'RAW',
           requestBody: { values: [['TRUE']] },
         });
