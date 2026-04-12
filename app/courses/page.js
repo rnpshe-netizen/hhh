@@ -177,7 +177,6 @@ export default function CoursesPage() {
           <table>
             <thead>
               <tr>
-                <th>상태</th>
                 <th>과정명</th>
                 <th>분류</th>
                 <th style={{ textAlign: 'center' }}>시간</th>
@@ -197,12 +196,6 @@ export default function CoursesPage() {
 
                 return (
                   <tr key={c.id || idx} style={{ opacity: c.is_active === false ? 0.5 : 1, transition: '0.2s' }}>
-                    <td>
-                      <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: c.is_active === false ? 'gray' : 'var(--success)' }}></span>
-                      <span style={{ marginLeft: '8px', fontSize: '13px', color: c.is_active === false ? 'gray' : 'var(--text-main)' }}>
-                        {c.is_active === false ? '종료' : '운영중'}
-                      </span>
-                    </td>
                     <td>
                       {isEditing ? (
                         <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
@@ -297,7 +290,7 @@ export default function CoursesPage() {
                   </tr>
                 );
               })}
-              {courses.length === 0 && <tr><td colSpan="11"><EmptyState icon="📚" title="등록된 과정이 없습니다" /></td></tr>}
+              {courses.length === 0 && <tr><td colSpan="10"><EmptyState icon="📚" title="등록된 과정이 없습니다" /></td></tr>}
             </tbody>
           </table>
         )}
