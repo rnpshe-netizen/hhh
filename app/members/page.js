@@ -875,6 +875,9 @@ export default function MembersPage() {
                         <strong>{enr.course_name || enr.courses?.name || '-'}</strong>
                         {enr.is_retake && <span style={{ marginLeft: '8px', padding: '1px 6px', borderRadius: '4px', fontSize: '11px', backgroundColor: '#fef3c7', color: '#d97706' }}>재수강</span>}
                         {enr.extra_cert && <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '4px', fontSize: '11px', backgroundColor: '#e0e7ff', color: '#4338ca' }}>추가수료증</span>}
+                        {enr.schedule_title && (
+                          <div style={{ fontSize: '12px', color: '#4A90E2', marginTop: '2px' }}>📅 {enr.schedule_title}</div>
+                        )}
                       </div>
                       <span style={{ fontSize: '12px', color: '#9ca3af' }}>{enr.applied_at ? new Date(enr.applied_at).toLocaleDateString() : '-'}</span>
                     </div>

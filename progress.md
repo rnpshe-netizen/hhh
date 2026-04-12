@@ -102,6 +102,7 @@
 - [x] 하네스 엔지니어링 프로세스 보강 — 포괄 승인에도 QA 필수 그라운드룰 추가
 - [x] 공통 컴포넌트 전 페이지 일괄 적용 — alert 0건, Toast 전 페이지, Spinner/EmptyState/Pagination/ConfirmDialog 적용
 - [x] QA 잔여 결함 3건 수정 완료 — Toast.js useCallback 제거, lib/utils.js import 적용(중복 4개 삭제), CSS 중복 제거
+- [x] 과정 일정 관리 — schedules 테이블(30건) + 동기화 컬럼 I열 일정 추가 + 모달/동기화 UI 📅 일정 표시
 
 ### Phase 3: 수료증/자격증 자동 발급 `[░░░░░░░░░░] 0%` ⏳
 - [ ] PDF 웹 템플릿 생성/출력 엔진
