@@ -51,7 +51,7 @@ export function ToastProvider({ children }) {
           );
         })}
       </div>
-      <style>{`@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+      {/* slideIn 애니메이션은 globals.css에 정의 */}
     </ToastContext.Provider>
   );
 }
