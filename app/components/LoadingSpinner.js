@@ -17,7 +17,7 @@ export default function LoadingSpinner({ message = '데이터를 불러오는 �
         borderRadius: '50%', animation: 'spin 0.8s linear infinite',
       }} />
       {message && <p style={{ color: '#6b7280', fontSize: s.fontSize, margin: 0 }}>{message}</p>}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {/* spin 애니메이션은 globals.css에 정의 */}
     </div>
   );
 }

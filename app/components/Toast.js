@@ -17,14 +17,6 @@ export function ToastProvider({ children }) {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
   }, []);
 
-  const toast = useCallback({
-    success: (msg) => addToast(msg, 'success'),
-    error: (msg) => addToast(msg, 'error', 5000),
-    warning: (msg) => addToast(msg, 'warning', 4000),
-    info: (msg) => addToast(msg, 'info'),
-  }, [addToast]);
-
-  // useCallback으로 감싼 객체는 안 됨 — 수정
   const toastObj = {
     success: (msg) => addToast(msg, 'success'),
     error: (msg) => addToast(msg, 'error', 5000),
@@ -59,7 +51,7 @@ export function ToastProvider({ children }) {
           );
         })}
       </div>
-      <style>{`@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+      {/* slideIn 애니메이션은 globals.css에 정의 */}
     </ToastContext.Provider>
   );
 }

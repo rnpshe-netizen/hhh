@@ -101,7 +101,7 @@
 - [x] CSV 필드 정합성 — 영문이름/생년월일/주소/보유자격 컬럼 추가
 - [x] 하네스 엔지니어링 프로세스 보강 — 포괄 승인에도 QA 필수 그라운드룰 추가
 - [x] 공통 컴포넌트 전 페이지 일괄 적용 — alert 0건, Toast 전 페이지, Spinner/EmptyState/Pagination/ConfirmDialog 적용
-- [ ] QA 잔여 결함 수정 대기 — Toast.js useCallback 오용 제거, lib/utils.js import 적용, CSS 중복 정리
+- [x] QA 잔여 결함 3건 수정 완료 — Toast.js useCallback 제거, lib/utils.js import 적용(중복 4개 삭제), CSS 중복 제거
 
 ### Phase 3: 수료증/자격증 자동 발급 `[░░░░░░░░░░] 0%` ⏳
 - [ ] PDF 웹 템플릿 생성/출력 엔진
